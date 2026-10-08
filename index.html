@@ -10,6 +10,8 @@
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <!-- FileSaver for reliable browser downloads -->
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <!-- Supabase JS Client v2 for Cloud Database Sync -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
     /* DESIGN.md Tokens */
@@ -538,7 +540,12 @@
           <button class="nav-tab-btn" onclick="switchTab('tab-participants')">👥 참여자 관리 (18명)</button>
           <button class="nav-tab-btn" onclick="switchTab('tab-settings')">⚙️ 월별 설정·휴무</button>
           <button class="nav-tab-btn" onclick="switchTab('tab-export')">📥 확정 및 엑셀 다운로드</button>
+          <button class="nav-tab-btn" onclick="switchTab('tab-cloud')">☁️ 클라우드 DB</button>
         </nav>
+        <button type="button" class="btn btn-sm btn-ghost" id="btnSupabaseModal" onclick="openSupabaseModal()" title="클라우드 DB 연동 설정" style="padding: 4px 10px; border-radius: 20px; gap: 6px;">
+          <span id="supabaseIndicator" style="width: 8px; height: 8px; border-radius: 50%; background: #92918b; display: inline-block;"></span>
+          <span id="supabaseStatusText" style="font-size: 11px; font-weight: 600;">로컬 모드</span>
+        </button>
         <div style="font-size: 12px; color: var(--color-graphite); display: flex; align-items: center; gap: 4px;">
           <span>👤 담당자:</span>
           <input type="text" id="globalManagerName" class="input" style="padding: 3px 8px; font-size: 12px; width: 75px;" value="담당자" onchange="saveManagerName()">
@@ -978,6 +985,86 @@
           <button class="btn btn-ghost btn-sm" onclick="downloadSingleIndividualExcel()">📥 선택된 참여자 엑셀 1부 다운로드</button>
         </div>
       </div>
+    <!-- ========================================== -->
+    <!-- TAB 6: 클라우드 DB 연동 (Supabase) -->
+    <!-- ========================================== -->
+    <section id="tab-cloud" class="tab-content" style="display: none;">
+      <div class="card">
+        <div class="card-title">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>☁️ Supabase 클라우드 데이터베이스 연동 관리</span>
+            <span id="cloudStatusBadge" class="chip">로컬 모드 (미연동)</span>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="checkSupabaseConnection(true)">🔄 연결 상태 재확인</button>
+        </div>
+        <p class="card-description">
+          Supabase(클라우드 PostgreSQL)와 연동하면 근무표, 참여자 명단, 변경기록 대장이 클라우드에 자동 동기화되어 여러 PC나 담당자 간에 실시간으로 공유됩니다. 미연동 시에는 브라우저 내부 로컬 저장소(LocalStorage)에 안전하게 보관됩니다.
+        </p>
+
+        <div class="grid-2" style="margin-bottom: 20px;">
+          <!-- Supabase Credentials Form -->
+          <div style="border: 1px solid var(--color-warm-mist); border-radius: 12px; padding: 20px; background: var(--color-soft-paper);">
+            <h3 style="font-size: 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+              <span>🔑 Supabase 연결 정보 설정</span>
+            </h3>
+            
+            <div style="margin-bottom: 14px;">
+              <label style="font-weight: 600; font-size: 12px; display: block; margin-bottom: 4px;">Project URL</label>
+              <input type="text" id="supabaseUrlInput" class="input" style="width: 100%;" placeholder="https://xxxxxxxx.supabase.co">
+              <small style="color: var(--color-ash); font-size: 11px;">Supabase 대시보드 &gt; Project Settings &gt; API &gt; Project URL</small>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+              <label style="font-weight: 600; font-size: 12px; display: block; margin-bottom: 4px;">Anon Public API Key</label>
+              <div style="display: flex; gap: 6px;">
+                <input type="password" id="supabaseKeyInput" class="input" style="flex: 1;" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="toggleSupabaseKeyVisibility()">👁️ 보기</button>
+              </div>
+              <small style="color: var(--color-ash); font-size: 11px;">Project Settings &gt; API &gt; Project API keys &gt; <code>anon</code> <code>public</code> 키</small>
+            </div>
+
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button class="btn btn-teal" onclick="saveAndConnectSupabase()">🔗 연결 및 저장</button>
+              <button class="btn btn-ghost" onclick="disconnectSupabase()">🔌 연동 해제 (로컬 모드)</button>
+            </div>
+            
+            <div id="cloudConnectionMsg" style="margin-top: 12px; font-size: 12px; display: none;"></div>
+          </div>
+
+          <!-- Data Migration & Sync Tools -->
+          <div style="border: 1px solid var(--color-warm-mist); border-radius: 12px; padding: 20px; background: var(--color-soft-paper);">
+            <h3 style="font-size: 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+              <span>🔄 데이터 양방향 동기화 및 마이그레이션</span>
+            </h3>
+            <p style="color: var(--color-graphite); font-size: 12px; margin-bottom: 14px; line-height: 1.5;">
+              처음 Supabase를 연결하셨다면 로컬의 기존 데이터(참여자 18인, 편성 근무표 등)를 클라우드로 한 번에 올려주세요. 다른 기기에서 작업 시에는 클라우드 데이터를 내려받아 동기화할 수 있습니다.
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <button class="btn btn-primary" onclick="uploadAllLocalToSupabase()" style="justify-content: flex-start; padding: 10px 14px;">
+                <span>⬆️ 로컬 데이터 전체 &rarr; Supabase로 업로드 (초기 세팅)</span>
+              </button>
+              <button class="btn btn-ghost" onclick="downloadAllSupabaseToLocal()" style="justify-content: flex-start; padding: 10px 14px;">
+                <span>⬇️ Supabase 데이터 전체 &rarr; 로컬로 내려받기 (동기화)</span>
+              </button>
+            </div>
+
+            <div style="margin-top: 16px; padding: 10px 12px; background: var(--color-parchment); border-radius: 8px; border: 1px solid var(--color-warm-mist); font-size: 11px; color: var(--color-graphite);">
+              💡 <strong>자동 동기화 안내:</strong> Supabase가 정상 연결되어 있으면 참여자 수정, 근무표 편성/변경, 변경기록 대장 등록 시 자동으로 클라우드에 실시간 반영됩니다.
+            </div>
+          </div>
+        </div>
+
+        <!-- Supabase Setup Guide -->
+        <div style="border: 1px solid var(--color-warm-mist); border-radius: 12px; padding: 20px; background: var(--color-parchment);">
+          <h3 style="font-size: 15px; margin-bottom: 10px;">📋 Supabase 3분 세팅 가이드</h3>
+          <ol style="margin-left: 20px; font-size: 13px; line-height: 1.8; color: var(--color-ink);">
+            <li><strong>Supabase 프로젝트 생성:</strong> <a href="https://supabase.com" target="_blank" style="color: var(--color-deep-teal); font-weight: 600;">supabase.com</a>에 로그인 후 <code>New Project</code>를 생성합니다.</li>
+            <li><strong>SQL 스키마 실행:</strong> 프로젝트 좌측 메뉴의 <strong>SQL Editor</strong>로 이동하여 프로젝트 루트의 <code>supabase_schema.sql</code> 파일 내용을 복사해 붙여넣고 <strong>[Run]</strong> 버튼을 누릅니다. (테이블 5개 및 기본 18인 자동 생성)</li>
+            <li><strong>API 키 입력:</strong> 좌측 하단 <strong>Project Settings &gt; API</strong>에서 <code>Project URL</code>과 <code>Project API keys (anon public)</code>를 복사하여 위 입력칸에 넣고 <strong>[연결 및 저장]</strong>을 누릅니다.</li>
+          </ol>
+        </div>
+      </div>
     </section>
 
   </main>
@@ -1224,6 +1311,37 @@
     </div>
   </div>
 
+  <!-- Modal: Supabase Cloud DB Quick Setup -->
+  <div id="supabaseModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 style="font-size: 16px; display: flex; align-items: center; gap: 6px;">
+          <span>☁️ Supabase 클라우드 데이터베이스 설정</span>
+        </h3>
+        <button class="modal-close" onclick="closeSupabaseModal()">&times;</button>
+      </div>
+      <p style="font-size: 12px; color: var(--color-graphite); margin-bottom: 14px;">
+        Supabase 프로젝트 URL과 Anon Public Key를 입력하시면 클라우드 DB와 자동 연동됩니다.
+      </p>
+      <div style="margin-bottom: 12px;">
+        <label style="font-weight: 600; font-size: 12px; display: block; margin-bottom: 4px;">Project URL</label>
+        <input type="text" id="modalSupabaseUrlInput" class="input" style="width: 100%;" placeholder="https://xxxxxxxx.supabase.co">
+      </div>
+      <div style="margin-bottom: 14px;">
+        <label style="font-weight: 600; font-size: 12px; display: block; margin-bottom: 4px;">Anon Public Key</label>
+        <input type="password" id="modalSupabaseKeyInput" class="input" style="width: 100%;" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+      </div>
+      <div id="modalSupabaseStatusMsg" style="margin-bottom: 14px; font-size: 12px; display: none;"></div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="disconnectSupabaseModal()">연동 해제</button>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn btn-ghost" onclick="closeSupabaseModal()">닫기</button>
+          <button type="button" class="btn btn-teal" onclick="saveAndConnectSupabaseModal()">연결 및 저장</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     /* =====================================================================
        1. DATA STRUCTURES & DEFAULT 18 PARTICIPANTS (PRD 3.1 & 6.1)
@@ -1272,7 +1390,606 @@
     let currentManager = '담당자';
 
     /* =====================================================================
-       2. INITIALIZATION & STORAGE
+       2. SUPABASE CLOUD DATABASE LAYER & STORAGE ADAPTER
+       ===================================================================== */
+    const STORAGE_KEY_SUPABASE_CONFIG = 'nambu_greenpop_supabase_config_v1';
+    let supabaseClient = null;
+    let isSupabaseConnected = false;
+
+    function getSupabaseConfig() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY_SUPABASE_CONFIG);
+        return saved ? JSON.parse(saved) : { url: '', key: '', autoSync: true };
+      } catch (e) {
+        return { url: '', key: '', autoSync: true };
+      }
+    }
+
+    function saveSupabaseConfig(cfg) {
+      localStorage.setItem(STORAGE_KEY_SUPABASE_CONFIG, JSON.stringify(cfg));
+    }
+
+    async function initSupabaseClient(silent = false) {
+      const cfg = getSupabaseConfig();
+      const url = (cfg.url || '').trim();
+      const key = (cfg.key || '').trim();
+
+      // Populate input fields in cloud tab & modal
+      const uEl = document.getElementById('supabaseUrlInput');
+      const kEl = document.getElementById('supabaseKeyInput');
+      const muEl = document.getElementById('modalSupabaseUrlInput');
+      const mkEl = document.getElementById('modalSupabaseKeyInput');
+      if (uEl) uEl.value = url;
+      if (kEl) kEl.value = key;
+      if (muEl) muEl.value = url;
+      if (mkEl) mkEl.value = key;
+
+      if (!url || !key) {
+        supabaseClient = null;
+        isSupabaseConnected = false;
+        updateSupabaseUIState('disconnected');
+        return false;
+      }
+
+      if (typeof window.supabase === 'undefined' || typeof window.supabase.createClient !== 'function') {
+        console.warn('Supabase SDK not loaded yet.');
+        supabaseClient = null;
+        isSupabaseConnected = false;
+        updateSupabaseUIState('error', 'Supabase JS 라이브러리를 불러오지 못했습니다.');
+        return false;
+      }
+
+      try {
+        supabaseClient = window.supabase.createClient(url, key, {
+          auth: { persistSession: false }
+        });
+
+        // Test connection by querying 1 record from participants
+        const { data, error } = await supabaseClient.from('participants').select('id').limit(1);
+        if (error) {
+          throw error;
+        }
+
+        isSupabaseConnected = true;
+        updateSupabaseUIState('connected');
+        if (!silent) {
+          showBanner('success', '☁️ Supabase 클라우드 데이터베이스와 연결되었습니다.');
+        }
+
+        // Pull latest data from Supabase
+        await pullLatestFromSupabase();
+        return true;
+      } catch (err) {
+        console.warn('Supabase connection error:', err);
+        supabaseClient = null;
+        isSupabaseConnected = false;
+        const msg = err.message || '접속 오류';
+        updateSupabaseUIState('error', msg);
+        if (!silent) {
+          showBanner('warning', `Supabase 연결 실패 (${msg}) - 로컬 저장소 모드로 작동합니다.`);
+        }
+        return false;
+      }
+    }
+
+    function updateSupabaseUIState(status, message = '') {
+      const ind = document.getElementById('supabaseIndicator');
+      const txt = document.getElementById('supabaseStatusText');
+      const badge = document.getElementById('cloudStatusBadge');
+      const connMsg = document.getElementById('cloudConnectionMsg');
+      const modalMsg = document.getElementById('modalSupabaseStatusMsg');
+
+      if (status === 'connected') {
+        if (ind) ind.style.backgroundColor = '#38a169';
+        if (txt) txt.textContent = 'Supabase 연결됨';
+        if (badge) {
+          badge.textContent = '🟢 클라우드 동기화 중';
+          badge.className = 'chip chip-teal';
+        }
+        if (connMsg) {
+          connMsg.style.display = 'block';
+          connMsg.style.color = '#2f855a';
+          connMsg.innerHTML = '✅ <strong>Supabase 연결 성공:</strong> 실시간 데이터 동기화가 활성화되어 있습니다.';
+        }
+        if (modalMsg) {
+          modalMsg.style.display = 'block';
+          modalMsg.style.color = '#2f855a';
+          modalMsg.innerHTML = '✅ 정상 연결됨';
+        }
+      } else if (status === 'error') {
+        if (ind) ind.style.backgroundColor = '#c53030';
+        if (txt) txt.textContent = '연결 오류';
+        if (badge) {
+          badge.textContent = '🔴 연결 오류 (로컬 모드)';
+          badge.className = 'chip';
+        }
+        if (connMsg) {
+          connMsg.style.display = 'block';
+          connMsg.style.color = '#c53030';
+          connMsg.innerHTML = `⚠️ <strong>연결 실패:</strong> ${message}<br><small>URL, Key 및 supabase_schema.sql 적용 여부를 확인하세요.</small>`;
+        }
+        if (modalMsg) {
+          modalMsg.style.display = 'block';
+          modalMsg.style.color = '#c53030';
+          modalMsg.innerHTML = `⚠️ 연결 실패: ${message}`;
+        }
+      } else {
+        if (ind) ind.style.backgroundColor = '#92918b';
+        if (txt) txt.textContent = '로컬 모드';
+        if (badge) {
+          badge.textContent = '🟡 로컬 모드 (미연동)';
+          badge.className = 'chip';
+        }
+        if (connMsg) {
+          connMsg.style.display = 'none';
+        }
+        if (modalMsg) {
+          modalMsg.style.display = 'none';
+        }
+      }
+    }
+
+    async function checkSupabaseConnection(showAlert = false) {
+      const success = await initSupabaseClient(false);
+      if (showAlert) {
+        if (success) {
+          alert('✅ Supabase 클라우드 데이터베이스에 성공적으로 연결되었습니다.');
+        } else {
+          alert('❌ Supabase 연결 실패: URL 및 Anon Key, 인터넷 연결 상태를 확인해주세요.');
+        }
+      }
+    }
+
+    async function saveAndConnectSupabase() {
+      const url = document.getElementById('supabaseUrlInput').value.trim();
+      const key = document.getElementById('supabaseKeyInput').value.trim();
+      if (!url || !key) {
+        alert('Supabase Project URL과 Anon API Key를 모두 입력해주세요.');
+        return;
+      }
+      saveSupabaseConfig({ url, key, autoSync: true });
+      const ok = await initSupabaseClient(false);
+      if (ok) {
+        alert('✅ Supabase 클라우드 연결에 성공했습니다!\n로컬 데이터를 클라우드로 전송하시려면 [로컬 데이터 전체 -> Supabase로 업로드] 버튼을 눌러주세요.');
+      }
+    }
+
+    async function saveAndConnectSupabaseModal() {
+      const url = document.getElementById('modalSupabaseUrlInput').value.trim();
+      const key = document.getElementById('modalSupabaseKeyInput').value.trim();
+      if (!url || !key) {
+        alert('Supabase Project URL과 Anon API Key를 모두 입력해주세요.');
+        return;
+      }
+      saveSupabaseConfig({ url, key, autoSync: true });
+      const ok = await initSupabaseClient(false);
+      if (ok) {
+        closeSupabaseModal();
+        alert('✅ Supabase 클라우드 연결에 성공했습니다!');
+      }
+    }
+
+    function disconnectSupabase() {
+      if (!confirm('Supabase 연동을 해제하고 로컬 모드로 전환하시겠습니까? (로컬 데이터는 그대로 보존됩니다)')) return;
+      localStorage.removeItem(STORAGE_KEY_SUPABASE_CONFIG);
+      supabaseClient = null;
+      isSupabaseConnected = false;
+      const uEl = document.getElementById('supabaseUrlInput');
+      const kEl = document.getElementById('supabaseKeyInput');
+      if (uEl) uEl.value = '';
+      if (kEl) kEl.value = '';
+      updateSupabaseUIState('disconnected');
+      showBanner('info', 'Supabase 연동이 해제되었습니다. 로컬 모드로 동작합니다.');
+    }
+
+    function disconnectSupabaseModal() {
+      disconnectSupabase();
+      closeSupabaseModal();
+    }
+
+    function openSupabaseModal() {
+      const cfg = getSupabaseConfig();
+      const muEl = document.getElementById('modalSupabaseUrlInput');
+      const mkEl = document.getElementById('modalSupabaseKeyInput');
+      if (muEl) muEl.value = cfg.url || '';
+      if (mkEl) mkEl.value = cfg.key || '';
+      document.getElementById('supabaseModal').style.display = 'flex';
+    }
+
+    function closeSupabaseModal() {
+      document.getElementById('supabaseModal').style.display = 'none';
+    }
+
+    function toggleSupabaseKeyVisibility() {
+      const kEl = document.getElementById('supabaseKeyInput');
+      if (kEl) {
+        kEl.type = kEl.type === 'password' ? 'text' : 'password';
+      }
+    }
+
+    // Pull Latest data from Supabase
+    async function pullLatestFromSupabase() {
+      if (!isSupabaseConnected || !supabaseClient) return;
+      try {
+        // 1. Pull Participants
+        const { data: pData, error: pErr } = await supabaseClient.from('participants').select('*').order('id', { ascending: true });
+        if (!pErr && pData && pData.length > 0) {
+          participants = pData.map(r => ({
+            id: r.id,
+            name: r.name,
+            shift: r.shift,
+            days: Array.isArray(r.days) ? r.days : (typeof r.days === 'string' ? JSON.parse(r.days || '[]') : []),
+            sale: r.sale,
+            produce: r.produce,
+            machine: r.machine,
+            prevShortage: r.prev_shortage || 0,
+            prevPriorityUsed: r.prev_priority_used || 0
+          }));
+          localStorage.setItem(STORAGE_KEY_PARTICIPANTS, JSON.stringify(participants));
+        }
+
+        // 2. Pull Change History
+        const { data: hData, error: hErr } = await supabaseClient.from('change_history').select('*').order('timestamp', { ascending: false });
+        if (!hErr && hData) {
+          changeHistory = hData.map(r => ({
+            id: r.id,
+            ym: r.ym,
+            timestamp: r.timestamp,
+            type: r.type,
+            personId: r.person_id || '',
+            personName: r.person_name || '',
+            detail: r.detail || '',
+            reason: r.reason || '',
+            memo: r.memo || '',
+            manager: r.manager || '',
+            oldDate: r.old_date || '',
+            newDate: r.new_date || '',
+            oldRole: r.old_role || '',
+            newRole: r.new_role || '',
+            substituteId: r.substitute_id || '',
+            substituteName: r.substitute_name || ''
+          }));
+          localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(changeHistory));
+        }
+
+        // 3. Pull Current Month Schedule & Settings
+        const ym = document.getElementById('targetYearMonth').value;
+        const { data: sData, error: sErr } = await supabaseClient.from('monthly_schedules').select('*').eq('ym', ym).maybeSingle();
+        if (!sErr && sData) {
+          currentSchedule = sData.schedule || {};
+          scheduleMetadata = sData.metadata || { status: 'draft', confirmedAt: null };
+          const allSchedules = JSON.parse(localStorage.getItem(STORAGE_KEY_SCHEDULES) || '{}');
+          allSchedules[ym] = { schedule: currentSchedule, metadata: scheduleMetadata };
+          localStorage.setItem(STORAGE_KEY_SCHEDULES, JSON.stringify(allSchedules));
+        }
+
+        const { data: stData, error: stErr } = await supabaseClient.from('monthly_settings').select('*').eq('ym', ym).maybeSingle();
+        if (!stErr && stData) {
+          monthlySettings = {
+            holidays: stData.holidays || {},
+            unavailable: stData.unavailable || {}
+          };
+          initDefaultKoreanHolidays(ym);
+          const allSettings = JSON.parse(localStorage.getItem(STORAGE_KEY_SETTINGS) || '{}');
+          allSettings[ym] = monthlySettings;
+          localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(allSettings));
+        }
+
+        renderAll();
+      } catch (err) {
+        console.warn('pullLatestFromSupabase error:', err);
+      }
+    }
+
+    async function pullMonthFromSupabase(ym) {
+      if (!isSupabaseConnected || !supabaseClient) return;
+      try {
+        const { data: sData, error: sErr } = await supabaseClient.from('monthly_schedules').select('*').eq('ym', ym).maybeSingle();
+        if (!sErr && sData) {
+          currentSchedule = sData.schedule || {};
+          scheduleMetadata = sData.metadata || { status: 'draft', confirmedAt: null };
+          const allSchedules = JSON.parse(localStorage.getItem(STORAGE_KEY_SCHEDULES) || '{}');
+          allSchedules[ym] = { schedule: currentSchedule, metadata: scheduleMetadata };
+          localStorage.setItem(STORAGE_KEY_SCHEDULES, JSON.stringify(allSchedules));
+        }
+
+        const { data: stData, error: stErr } = await supabaseClient.from('monthly_settings').select('*').eq('ym', ym).maybeSingle();
+        if (!stErr && stData) {
+          monthlySettings = {
+            holidays: stData.holidays || {},
+            unavailable: stData.unavailable || {}
+          };
+          initDefaultKoreanHolidays(ym);
+          const allSettings = JSON.parse(localStorage.getItem(STORAGE_KEY_SETTINGS) || '{}');
+          allSettings[ym] = monthlySettings;
+          localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(allSettings));
+        }
+
+        renderAll();
+      } catch (err) {
+        console.warn('pullMonthFromSupabase error:', err);
+      }
+    }
+
+    // Async sync functions to cloud
+    async function syncParticipantsToSupabase() {
+      if (!isSupabaseConnected || !supabaseClient) return;
+      try {
+        const payload = participants.map(p => ({
+          id: p.id,
+          name: p.name,
+          shift: p.shift,
+          days: p.days,
+          sale: p.sale,
+          produce: p.produce,
+          machine: p.machine,
+          prev_shortage: p.prevShortage || 0,
+          prev_priority_used: p.prevPriorityUsed || 0,
+          updated_at: new Date().toISOString()
+        }));
+        await supabaseClient.from('participants').upsert(payload);
+      } catch (err) {
+        console.warn('Supabase participants sync error:', err);
+      }
+    }
+
+    async function syncDeleteParticipantFromSupabase(id) {
+      if (!isSupabaseConnected || !supabaseClient) return;
+      try {
+        await supabaseClient.from('participants').delete().eq('id', id);
+      } catch (err) {
+        console.warn('Supabase participant delete error:', err);
+      }
+    }
+
+    async function syncScheduleToSupabase(ym) {
+      if (!isSupabaseConnected || !supabaseClient) return;
+      try {
+        await supabaseClient.from('monthly_schedules').upsert({
+          ym: ym,
+          schedule: currentSchedule,
+          metadata: scheduleMetadata,
+          updated_at: new Date().toISOString()
+        });
+      } catch (err) {
+        console.warn('Supabase schedule sync error:', err);
+      }
+    }
+
+    async function syncSettingsToSupabase(ym) {
+      if (!isSupabaseConnected || !supabaseClient) return;
+      try {
+        await supabaseClient.from('monthly_settings').upsert({
+          ym: ym,
+          holidays: monthlySettings.holidays || {},
+          unavailable: monthlySettings.unavailable || {},
+          updated_at: new Date().toISOString()
+        });
+      } catch (err) {
+        console.warn('Supabase settings sync error:', err);
+      }
+    }
+
+    async function syncHistoryRecordToSupabase(record) {
+      if (!isSupabaseConnected || !supabaseClient) return;
+      try {
+        await supabaseClient.from('change_history').upsert({
+          id: record.id,
+          ym: record.ym,
+          timestamp: record.timestamp,
+          type: record.type,
+          person_id: record.personId,
+          person_name: record.personName,
+          detail: record.detail,
+          reason: record.reason,
+          memo: record.memo,
+          manager: record.manager,
+          old_date: record.oldDate,
+          new_date: record.newDate,
+          old_role: record.oldRole,
+          new_role: record.newRole,
+          substitute_id: record.substituteId,
+          substitute_name: record.substituteName
+        });
+      } catch (err) {
+        console.warn('Supabase history sync error:', err);
+      }
+    }
+
+    async function syncManagerNameToSupabase() {
+      if (!isSupabaseConnected || !supabaseClient) return;
+      try {
+        await supabaseClient.from('app_settings').upsert({
+          key: 'current_manager',
+          value: { manager: currentManager },
+          updated_at: new Date().toISOString()
+        });
+      } catch (err) {
+        console.warn('Supabase manager sync error:', err);
+      }
+    }
+
+    async function uploadAllLocalToSupabase() {
+      if (!isSupabaseConnected || !supabaseClient) {
+        alert('먼저 Supabase Project URL과 Anon API Key를 입력하여 [연결 및 저장]을 완료해주세요.');
+        return;
+      }
+      if (!confirm('로컬에 저장된 참여자 명단(18명), 월간 근무표, 휴무 설정, 변경기록 대장을 Supabase 클라우드로 모두 업로드하시겠습니까?')) return;
+
+      try {
+        showBanner('info', '클라우드로 전체 로컬 데이터를 업로드하고 있습니다...');
+
+        // 1. Participants
+        if (participants && participants.length > 0) {
+          const pPayload = participants.map(p => ({
+            id: p.id,
+            name: p.name,
+            shift: p.shift,
+            days: p.days,
+            sale: p.sale,
+            produce: p.produce,
+            machine: p.machine,
+            prev_shortage: p.prevShortage || 0,
+            prev_priority_used: p.prevPriorityUsed || 0,
+            updated_at: new Date().toISOString()
+          }));
+          const { error: pErr } = await supabaseClient.from('participants').upsert(pPayload);
+          if (pErr) throw pErr;
+        }
+
+        // 2. Monthly Schedules
+        const allSchedules = JSON.parse(localStorage.getItem(STORAGE_KEY_SCHEDULES) || '{}');
+        const schedRows = Object.entries(allSchedules).map(([ymKey, val]) => ({
+          ym: ymKey,
+          schedule: val.schedule || {},
+          metadata: val.metadata || {},
+          updated_at: new Date().toISOString()
+        }));
+        if (schedRows.length > 0) {
+          const { error: sErr } = await supabaseClient.from('monthly_schedules').upsert(schedRows);
+          if (sErr) throw sErr;
+        }
+
+        // 3. Monthly Settings
+        const allSettings = JSON.parse(localStorage.getItem(STORAGE_KEY_SETTINGS) || '{}');
+        const setRows = Object.entries(allSettings).map(([ymKey, val]) => ({
+          ym: ymKey,
+          holidays: val.holidays || {},
+          unavailable: val.unavailable || {},
+          updated_at: new Date().toISOString()
+        }));
+        if (setRows.length > 0) {
+          const { error: setErr } = await supabaseClient.from('monthly_settings').upsert(setRows);
+          if (setErr) throw setErr;
+        }
+
+        // 4. Change History
+        if (changeHistory && changeHistory.length > 0) {
+          const histRows = changeHistory.map(r => ({
+            id: r.id,
+            ym: r.ym,
+            timestamp: r.timestamp,
+            type: r.type,
+            person_id: r.personId,
+            person_name: r.personName,
+            detail: r.detail,
+            reason: r.reason,
+            memo: r.memo,
+            manager: r.manager,
+            old_date: r.oldDate,
+            new_date: r.newDate,
+            old_role: r.oldRole,
+            new_role: r.newRole,
+            substitute_id: r.substituteId,
+            substitute_name: r.substituteName
+          }));
+          const { error: hErr } = await supabaseClient.from('change_history').upsert(histRows);
+          if (hErr) throw hErr;
+        }
+
+        // 5. Manager
+        await supabaseClient.from('app_settings').upsert({
+          key: 'current_manager',
+          value: { manager: currentManager },
+          updated_at: new Date().toISOString()
+        });
+
+        showBanner('success', '✅ 로컬 데이터 전체가 Supabase 클라우드로 안전하게 업로드되었습니다!');
+        alert('✅ 로컬 데이터 전체가 Supabase 클라우드에 성공적으로 업로드되었습니다.');
+      } catch (err) {
+        console.error('Upload all error:', err);
+        showBanner('danger', `업로드 중 오류 발생: ${err.message || err}`);
+        alert(`❌ 업로드 실패: ${err.message || 'Supabase 연결 상태 및 테이블을 확인하세요.'}`);
+      }
+    }
+
+    async function downloadAllSupabaseToLocal() {
+      if (!isSupabaseConnected || !supabaseClient) {
+        alert('먼저 Supabase Project URL과 Anon API Key를 입력하여 [연결 및 저장]을 완료해주세요.');
+        return;
+      }
+      if (!confirm('Supabase 클라우드의 데이터를 내려받아 로컬 캐시를 최신 상태로 덮어쓰시겠습니까?')) return;
+
+      try {
+        showBanner('info', 'Supabase 클라우드에서 데이터를 내려받고 있습니다...');
+
+        // 1. Participants
+        const { data: pData, error: pErr } = await supabaseClient.from('participants').select('*').order('id', { ascending: true });
+        if (!pErr && pData && pData.length > 0) {
+          participants = pData.map(r => ({
+            id: r.id,
+            name: r.name,
+            shift: r.shift,
+            days: Array.isArray(r.days) ? r.days : (typeof r.days === 'string' ? JSON.parse(r.days || '[]') : []),
+            sale: r.sale,
+            produce: r.produce,
+            machine: r.machine,
+            prevShortage: r.prev_shortage || 0,
+            prevPriorityUsed: r.prev_priority_used || 0
+          }));
+          localStorage.setItem(STORAGE_KEY_PARTICIPANTS, JSON.stringify(participants));
+        }
+
+        // 2. Monthly Schedules
+        const { data: sData, error: sErr } = await supabaseClient.from('monthly_schedules').select('*');
+        if (!sErr && sData) {
+          const allSchedules = {};
+          sData.forEach(r => {
+            allSchedules[r.ym] = { schedule: r.schedule, metadata: r.metadata };
+          });
+          localStorage.setItem(STORAGE_KEY_SCHEDULES, JSON.stringify(allSchedules));
+        }
+
+        // 3. Monthly Settings
+        const { data: setData, error: setErr } = await supabaseClient.from('monthly_settings').select('*');
+        if (!setErr && setData) {
+          const allSettings = {};
+          setData.forEach(r => {
+            allSettings[r.ym] = { holidays: r.holidays, unavailable: r.unavailable };
+          });
+          localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(allSettings));
+        }
+
+        // 4. Change History
+        const { data: hData, error: hErr } = await supabaseClient.from('change_history').select('*').order('timestamp', { ascending: false });
+        if (!hErr && hData) {
+          changeHistory = hData.map(r => ({
+            id: r.id,
+            ym: r.ym,
+            timestamp: r.timestamp,
+            type: r.type,
+            personId: r.person_id || '',
+            personName: r.person_name || '',
+            detail: r.detail || '',
+            reason: r.reason || '',
+            memo: r.memo || '',
+            manager: r.manager || '',
+            oldDate: r.old_date || '',
+            newDate: r.new_date || '',
+            oldRole: r.old_role || '',
+            newRole: r.new_role || '',
+            substituteId: r.substitute_id || '',
+            substituteName: r.substitute_name || ''
+          }));
+          localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(changeHistory));
+        }
+
+        // Reload current month
+        const currentYm = document.getElementById('targetYearMonth').value;
+        loadMonthData(currentYm);
+        renderAll();
+
+        showBanner('success', '✅ Supabase 클라우드 데이터가 로컬에 정상 동기화되었습니다!');
+        alert('✅ Supabase 클라우드 데이터가 로컬에 성공적으로 동기화되었습니다.');
+      } catch (err) {
+        console.error('Download error:', err);
+        showBanner('danger', `내려받기 중 오류: ${err.message || err}`);
+        alert(`❌ 데이터 가져오기 실패: ${err.message || err}`);
+      }
+    }
+
+    /* =====================================================================
+       2.1 INITIALIZATION & LOCAL STORAGE
        ===================================================================== */
     function init() {
       // 0. Load Manager Name & Change History
@@ -1302,10 +2019,13 @@
 
       loadMonthData(`${y}-${m}`);
       renderAll();
+
+      // 3. Connect Supabase Client in background (if configured)
+      initSupabaseClient(true);
     }
 
     /* =====================================================================
-       2.1 CHANGE HISTORY & MANAGER MANAGEMENT (PRD Section 5 & Audit)
+       2.2 CHANGE HISTORY & MANAGER MANAGEMENT (PRD Section 5 & Audit)
        ===================================================================== */
     function loadManagerName() {
       const saved = localStorage.getItem(STORAGE_KEY_MANAGER);
@@ -1329,6 +2049,7 @@
         if (scEl) scEl.value = currentManager;
         const mhEl = document.getElementById('mhManagerInput');
         if (mhEl) mhEl.value = currentManager;
+        syncManagerNameToSupabase();
       }
     }
 
@@ -1376,13 +2097,16 @@
 
       changeHistory.unshift(record);
       saveChangeHistory();
+      syncHistoryRecordToSupabase(record);
       renderHistoryTable();
       return record;
     }
 
     function saveParticipants() {
       localStorage.setItem(STORAGE_KEY_PARTICIPANTS, JSON.stringify(participants));
-      document.getElementById('participantCount').innerText = participants.length;
+      const pCountEl = document.getElementById('participantCount');
+      if (pCountEl) pCountEl.innerText = participants.length;
+      syncParticipantsToSupabase();
     }
 
     function saveMonthSchedule(ym) {
@@ -1392,6 +2116,7 @@
         metadata: scheduleMetadata
       };
       localStorage.setItem(STORAGE_KEY_SCHEDULES, JSON.stringify(allSchedules));
+      syncScheduleToSupabase(ym);
     }
 
     function loadMonthData(ym) {
@@ -1461,12 +2186,16 @@
       const allSettings = JSON.parse(localStorage.getItem(STORAGE_KEY_SETTINGS) || '{}');
       allSettings[ym] = monthlySettings;
       localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(allSettings));
+      syncSettingsToSupabase(ym);
     }
 
-    function onMonthChanged() {
+    async function onMonthChanged() {
       const ym = document.getElementById('targetYearMonth').value;
       loadMonthData(ym);
       renderAll();
+      if (isSupabaseConnected) {
+        await pullMonthFromSupabase(ym);
+      }
     }
 
     /* =====================================================================
@@ -2396,6 +3125,7 @@
       if (!confirm(`참여자 [${p ? p.name : id}] 님을 명단에서 삭제하시겠습니까?`)) return;
       participants = participants.filter(x => x.id !== id);
       saveParticipants();
+      syncDeleteParticipantFromSupabase(id);
       renderAll();
     }
 
