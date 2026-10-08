@@ -1,0 +1,2504 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>남부그린팝 공동체사업 월간 근무표 자동 편성 도구</title>
+  <!-- SheetJS for Excel generation and parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- JSZip for ZIP packaging -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <!-- FileSaver for reliable browser downloads -->
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+
+  <style>
+    /* DESIGN.md Tokens */
+    :root {
+      --color-parchment: #faf8f5;
+      --color-soft-paper: #fdfbfa;
+      --color-warm-mist: #d1d1cd;
+      --color-ash: #92918b;
+      --color-graphite: #72706b;
+      --color-ink: #27251e;
+      --color-pure-black: #000000;
+      --color-deep-teal: #016a71;
+      --color-teal-subtle: rgba(1, 106, 113, 0.08);
+      --color-warning-subtle: #fff4e5;
+      --color-warning-border: #f5c278;
+      --color-danger-subtle: #fde8e8;
+      --color-danger-border: #f8b4b4;
+
+      --font-family: -apple-system, BlinkMacSystemFont, "Pretendard Variable", Pretendard, "Segoe UI", Roboto, sans-serif;
+      --radius-cards: 16px;
+      --radius-inputs: 12px;
+      --radius-buttons: 6px;
+      --radius-chips: 9999px;
+      --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.08);
+      --spacing-unit: 4px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-family);
+      background-color: var(--color-parchment);
+      color: var(--color-ink);
+      line-height: 1.5;
+      font-size: 14px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Layout */
+    .app-header {
+      background-color: var(--color-soft-paper);
+      border-bottom: 1px solid var(--color-warm-mist);
+      padding: 16px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--color-ink);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-tag {
+      background-color: var(--color-deep-teal);
+      color: #ffffff;
+      border-radius: var(--radius-chips);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      display: inline-block;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      background-color: var(--color-parchment);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--color-warm-mist);
+    }
+
+    .nav-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--color-graphite);
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nav-tab-btn:hover {
+      color: var(--color-ink);
+      background-color: rgba(0,0,0,0.03);
+    }
+
+    .nav-tab-btn.active {
+      background-color: var(--color-deep-teal);
+      color: #ffffff;
+    }
+
+    .container {
+      max-width: 1200px;
+      width: 100%;
+      margin: 20px auto;
+      padding: 0 16px;
+      flex: 1;
+    }
+
+    /* Cards */
+    .card {
+      background-color: var(--color-soft-paper);
+      border-radius: var(--radius-cards);
+      border: 1px solid var(--color-warm-mist);
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-subtle);
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      color: var(--color-ink);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-description {
+      color: var(--color-graphite);
+      font-size: 13px;
+      margin-bottom: 16px;
+      line-height: 1.45;
+    }
+
+    /* Buttons */
+    .btn {
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 7px 14px;
+      border-radius: var(--radius-buttons);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      border: none;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background-color: var(--color-ink);
+      color: var(--color-parchment);
+    }
+
+    .btn-primary:hover {
+      background-color: #000000;
+    }
+
+    .btn-teal {
+      background-color: var(--color-deep-teal);
+      color: #ffffff;
+    }
+
+    .btn-teal:hover {
+      background-color: #015459;
+    }
+
+    .btn-ghost {
+      background-color: transparent;
+      color: var(--color-graphite);
+      border: 1px solid var(--color-warm-mist);
+    }
+
+    .btn-ghost:hover {
+      color: var(--color-ink);
+      border-color: var(--color-graphite);
+      background-color: rgba(0,0,0,0.02);
+    }
+
+    .btn-sm {
+      padding: 4px 10px;
+      font-size: 12px;
+      border-radius: 4px;
+    }
+
+    .btn-danger {
+      background-color: #c53030;
+      color: white;
+    }
+    .btn-danger:hover {
+      background-color: #9b2c2c;
+    }
+
+    /* Inputs & Selects */
+    .input, .select, .textarea {
+      font-family: inherit;
+      font-size: 13px;
+      padding: 8px 12px;
+      border-radius: var(--radius-inputs);
+      border: 1px solid var(--color-warm-mist);
+      background-color: var(--color-parchment);
+      color: var(--color-ink);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .input:focus, .select:focus, .textarea:focus {
+      border-color: var(--color-deep-teal);
+    }
+
+    /* Chips */
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: var(--radius-chips);
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid var(--color-warm-mist);
+      background-color: var(--color-parchment);
+      color: var(--color-ink);
+      cursor: default;
+    }
+
+    .chip-teal {
+      background-color: var(--color-teal-subtle);
+      border-color: var(--color-deep-teal);
+      color: var(--color-deep-teal);
+    }
+
+    .chip-warning {
+      background-color: var(--color-warning-subtle);
+      border-color: var(--color-warning-border);
+      color: #975a16;
+    }
+
+    .chip-danger {
+      background-color: var(--color-danger-subtle);
+      border-color: var(--color-danger-border);
+      color: #c53030;
+    }
+
+    .chip-selectable {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .chip-selectable.selected {
+      background-color: var(--color-deep-teal);
+      color: white;
+      border-color: var(--color-deep-teal);
+    }
+
+    /* Tables */
+    .table-container {
+      overflow-x: auto;
+      border: 1px solid var(--color-warm-mist);
+      border-radius: 12px;
+      background-color: var(--color-parchment);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f3efe9;
+      color: var(--color-graphite);
+      font-weight: 600;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--color-warm-mist);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--color-warm-mist);
+      color: var(--color-ink);
+      vertical-align: middle;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background-color: rgba(0,0,0,0.015);
+    }
+
+    /* Grid Layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 860px) {
+      .grid-2, .grid-3, .grid-4 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Alerts */
+    .alert-box {
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .alert-warning {
+      background-color: var(--color-warning-subtle);
+      border: 1px solid var(--color-warning-border);
+      color: #7b4205;
+    }
+
+    .alert-info {
+      background-color: var(--color-teal-subtle);
+      border: 1px solid rgba(1, 106, 113, 0.3);
+      color: var(--color-deep-teal);
+    }
+
+    .alert-danger {
+      background-color: var(--color-danger-subtle);
+      border: 1px solid var(--color-danger-border);
+      color: #9b2c2c;
+    }
+
+    /* Calendar Grid for Days */
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .calendar-header-day {
+      text-align: center;
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--color-graphite);
+      padding: 4px;
+    }
+
+    .calendar-day-cell {
+      border: 1px solid var(--color-warm-mist);
+      background-color: var(--color-soft-paper);
+      border-radius: 8px;
+      min-height: 80px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .calendar-day-cell:hover {
+      border-color: var(--color-deep-teal);
+    }
+
+    .calendar-day-cell.holiday {
+      background-color: #faf0ee;
+      opacity: 0.85;
+    }
+
+    .calendar-day-cell.weekend {
+      background-color: #f5f2ee;
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .calendar-day-cell.other-month {
+      visibility: hidden;
+    }
+
+    .day-num {
+      font-weight: 600;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .day-badge {
+      font-size: 10px;
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+
+    /* Slot badges */
+    .slot-pill {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-bottom: 2px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--color-parchment);
+      border: 1px solid var(--color-warm-mist);
+    }
+
+    .slot-pill.role-machine { border-left: 3px solid #6b46c1; }
+    .slot-pill.role-sale { border-left: 3px solid #2b6cb0; }
+    .slot-pill.role-produce { border-left: 3px solid #2f855a; }
+
+    /* Modals */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(39, 37, 30, 0.45);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+      backdrop-filter: blur(2px);
+    }
+
+    .modal-card {
+      background: var(--color-soft-paper);
+      border-radius: var(--radius-cards);
+      border: 1px solid var(--color-warm-mist);
+      width: 90%;
+      max-width: 650px;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+      padding: 24px;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--color-warm-mist);
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: var(--color-graphite);
+    }
+
+    /* Tooltip */
+    [title] {
+      cursor: help;
+    }
+
+    /* Print styles */
+    @media print {
+      .app-header, .no-print {
+        display: none !important;
+      }
+      .card {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+      }
+      body {
+        background: #ffffff;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand-title">
+        <span>🌱 남부그린팝 월간 근무표</span>
+        <span class="badge-tag">노인일자리 자동편성 v1.0</span>
+      </div>
+      <nav class="nav-tabs no-print">
+        <button class="nav-tab-btn active" onclick="switchTab('tab-schedule')">📅 근무표 편성/검토</button>
+        <button class="nav-tab-btn" onclick="switchTab('tab-manual')">✍️ 수동조정·추천</button>
+        <button class="nav-tab-btn" onclick="switchTab('tab-participants')">👥 참여자 관리 (18명)</button>
+        <button class="nav-tab-btn" onclick="switchTab('tab-settings')">⚙️ 월별 설정·휴무</button>
+        <button class="nav-tab-btn" onclick="switchTab('tab-export')">📥 확정 및 엑셀 다운로드</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- Top Month Selector & Quick Actions -->
+    <div class="card no-print" style="padding: 14px 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <label style="font-weight: 600; color: var(--color-graphite); font-size: 13px;">편성 대상 연월:</label>
+          <input type="month" id="targetYearMonth" class="input" style="padding: 6px 12px; font-weight: 600;" onchange="onMonthChanged()">
+          <span id="targetMonthStats" class="chip chip-teal">운영일 계산 중...</span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-teal" onclick="runAutoSchedule()">⚡ 자동 편성 실행</button>
+          <button class="btn btn-ghost" onclick="resetToAutoSchedulePrompt()">🔄 초기화</button>
+          <button class="btn btn-ghost" onclick="downloadAllExcel()">📊 엑셀 다운로드</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alert / Notice Banner -->
+    <div id="statusBanner" style="display: none;"></div>
+
+    <!-- ========================================== -->
+    <!-- TAB 1: 근무표 편성 및 일자별 검토 -->
+    <!-- ========================================== -->
+    <section id="tab-schedule" class="tab-content">
+      <!-- Summary Dashboard Cards -->
+      <div class="grid-4" style="margin-bottom: 20px;">
+        <div class="card" style="padding: 16px; margin: 0;">
+          <div style="color: var(--color-graphite); font-size: 12px;">총 참여자 목표 (인당 8회)</div>
+          <div style="font-size: 22px; font-weight: 700; margin: 4px 0;" id="statTotalTarget">144회</div>
+          <div style="font-size: 12px; color: var(--color-deep-teal);" id="statAssignedTotal">현재 배정: 0회</div>
+        </div>
+        <div class="card" style="padding: 16px; margin: 0;">
+          <div style="color: var(--color-graphite); font-size: 12px;">8회 목표 달성 참여자</div>
+          <div style="font-size: 22px; font-weight: 700; margin: 4px 0;" id="statTargetFullPeople">0 / 18명</div>
+          <div style="font-size: 12px;" id="statShortagePeople">부족 인원: 0명</div>
+        </div>
+        <div class="card" style="padding: 16px; margin: 0;">
+          <div style="color: var(--color-graphite); font-size: 12px;">필수 인원 충족률</div>
+          <div style="font-size: 22px; font-weight: 700; margin: 4px 0;" id="statEssentialRate">100%</div>
+          <div style="font-size: 12px; color: var(--color-graphite);">오전 판매1 / 오후 판매1·생산1</div>
+        </div>
+        <div class="card" style="padding: 16px; margin: 0;">
+          <div style="color: var(--color-graphite); font-size: 12px;">월~목 오후 기계 배정 현황</div>
+          <div style="font-size: 22px; font-weight: 700; margin: 4px 0;" id="statMachineStatus">-</div>
+          <div style="font-size: 11px; color: var(--color-ash);">공석 시 당일 생산 협의 필요</div>
+        </div>
+      </div>
+
+      <!-- Schedule Table / Calendar View Switch -->
+      <div class="card">
+        <div class="card-title">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>🗓️ <span id="currentViewMonthText"></span> 월간 종합 근무표</span>
+            <span id="scheduleStateBadge" class="chip">초안</span>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button class="btn btn-sm btn-ghost" id="btnViewTable" onclick="setScheduleView('table')">표 보기</button>
+            <button class="btn btn-sm btn-ghost" id="btnViewCalendar" onclick="setScheduleView('calendar')">달력 보기</button>
+          </div>
+        </div>
+
+        <div id="scheduleWarningList" style="margin-bottom: 12px;"></div>
+
+        <!-- Table View -->
+        <div id="viewScheduleTable" class="table-container">
+          <table id="mainScheduleTable">
+            <thead>
+              <tr>
+                <th style="width: 100px;">날짜 / 요일</th>
+                <th style="width: 90px;">구분</th>
+                <th>오전 (09:30~12:30)<br><small style="color:var(--color-ash)">판매 (최대 2명)</small></th>
+                <th>오후 (13:00~16:00)<br><small style="color:var(--color-ash)">기계 (최대 1명)</small></th>
+                <th>오후 (13:00~16:00)<br><small style="color:var(--color-ash)">판매 (최대 2명)</small></th>
+                <th>오후 (13:00~16:00)<br><small style="color:var(--color-ash)">생산 (월~목 최대 4명)</small></th>
+                <th style="width: 80px;">인원 합계</th>
+                <th style="width: 130px;">관리</th>
+              </tr>
+            </thead>
+            <tbody id="scheduleTableBody">
+              <!-- Dynamically Populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Calendar View -->
+        <div id="viewScheduleCalendar" style="display: none;">
+          <div class="calendar-grid" id="calendarGridHeader">
+            <div class="calendar-header-day" style="color: #e53e3e;">일</div>
+            <div class="calendar-header-day">월</div>
+            <div class="calendar-header-day">화</div>
+            <div class="calendar-header-day">수</div>
+            <div class="calendar-header-day">목</div>
+            <div class="calendar-header-day">금</div>
+            <div class="calendar-header-day" style="color: #3182ce;">토</div>
+          </div>
+          <div class="calendar-grid" id="calendarGridBody"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 2: 수동 조정 및 추가 배정 추천 -->
+    <!-- ========================================== -->
+    <section id="tab-manual" class="tab-content" style="display: none;">
+      <div class="card">
+        <div class="card-title">
+          <span>🎯 참여자별 목표(8회) 달성 현황 및 미배정 사유·추천 날짜</span>
+          <span style="font-size: 12px; font-weight: normal; color: var(--color-graphite);">희망 요일 부족분은 추천 일자에서 원클릭으로 추가 배정할 수 있습니다.</span>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 70px;">ID</th>
+                <th style="width: 90px;">이름</th>
+                <th style="width: 70px;">근무반</th>
+                <th style="width: 100px;">희망 요일</th>
+                <th style="width: 140px;">역할 조건 (판/생/기)</th>
+                <th style="width: 80px;">배정 횟수</th>
+                <th style="width: 80px;">부족 횟수</th>
+                <th style="width: 160px;">미배정 사유</th>
+                <th>추가 배정 가능 추천 날짜 (원클릭 배정)</th>
+              </tr>
+            </thead>
+            <tbody id="shortageTableBody">
+              <!-- Dynamically Populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Quick Day Inspector / Manual Slot Editor Modal trigger or card -->
+      <div class="card">
+        <div class="card-title">
+          <span>✍️ 특정 날짜 근무자 수동 조정 / 직접 배정</span>
+        </div>
+        <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap;">
+          <label style="font-weight: 600;">날짜 선택:</label>
+          <select id="manualDateSelect" class="select" onchange="onManualDateSelected()"></select>
+          <span id="manualDateInfo" class="chip chip-teal">선택 날짜 정보</span>
+        </div>
+        <div id="manualDayEditorContent" class="grid-2">
+          <!-- Left: AM Shift -->
+          <div style="border: 1px solid var(--color-warm-mist); border-radius: 12px; padding: 14px; background: var(--color-parchment);">
+            <h4 style="margin-bottom: 8px; font-size: 14px; display: flex; justify-content: space-between;">
+              <span>🌅 오전반 (09:30~12:30)</span>
+              <span class="chip">판매 최대 2명 (필수 1)</span>
+            </h4>
+            <div id="manualAmList" style="margin-bottom: 12px;"></div>
+            <div style="display: flex; gap: 6px;">
+              <select id="addAmPersonSelect" class="select" style="flex: 1;"></select>
+              <button class="btn btn-teal btn-sm" onclick="addManualPerson('AM', '판매')">+ 오전 판매 배정</button>
+            </div>
+          </div>
+
+          <!-- Right: PM Shift -->
+          <div style="border: 1px solid var(--color-warm-mist); border-radius: 12px; padding: 14px; background: var(--color-parchment);">
+            <h4 style="margin-bottom: 8px; font-size: 14px; display: flex; justify-content: space-between;">
+              <span>🌇 오후반 (13:00~16:00)</span>
+              <span id="manualPmCapacityBadge" class="chip">최대 인원 규정</span>
+            </h4>
+            <div id="manualPmList" style="margin-bottom: 12px;"></div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <select id="addPmPersonSelect" class="select" style="flex: 2; min-width: 140px;"></select>
+              <select id="addPmRoleSelect" class="select" style="flex: 1; min-width: 80px;">
+                <option value="판매">판매</option>
+                <option value="생산">생산</option>
+                <option value="기계">기계</option>
+              </select>
+              <button class="btn btn-teal btn-sm" onclick="addManualPmPerson()">+ 오후 배정</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 3: 참여자 관리 (18명 명단 & 엑셀 업로드) -->
+    <!-- ========================================== -->
+    <section id="tab-participants" class="tab-content" style="display: none;">
+      <div class="card">
+        <div class="card-title">
+          <span>👥 사업 참여자 관리 (현재 <span id="participantCount">18</span>명)</span>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-ghost btn-sm" onclick="downloadParticipantTemplate()">📄 엑셀 서식 다운로드</button>
+            <label class="btn btn-ghost btn-sm" style="margin: 0; cursor: pointer;">
+              📂 엑셀 명단 업로드
+              <input type="file" id="excelUploadInput" accept=".xlsx, .xls" style="display: none;" onchange="handleExcelUpload(event)">
+            </label>
+            <button class="btn btn-teal btn-sm" onclick="openAddParticipantModal()">+ 참여자 추가</button>
+          </div>
+        </div>
+        <p class="card-description">
+          참여자의 오전/오후 근무반, 고정 희망 요일, 역할별 조건(선호/가능/불가)을 관리합니다. 수정된 내용은 다음 달에도 자동 보존됩니다.
+        </p>
+
+        <div class="table-container">
+          <table id="participantTable">
+            <thead>
+              <tr>
+                <th style="width: 70px;">ID</th>
+                <th style="width: 100px;">이름</th>
+                <th style="width: 80px;">근무반</th>
+                <th>희망 요일</th>
+                <th style="width: 80px;">판매</th>
+                <th style="width: 80px;">생산</th>
+                <th style="width: 80px;">기계</th>
+                <th style="width: 110px;">직전월 미배정</th>
+                <th style="width: 110px;">우선권 적용</th>
+                <th style="width: 100px; text-align: center;">관리</th>
+              </tr>
+            </thead>
+            <tbody id="participantTableBody">
+              <!-- Dynamically Populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 4: 월별 설정 및 휴무일 / 참여 불가일 -->
+    <!-- ========================================== -->
+    <section id="tab-settings" class="tab-content" style="display: none;">
+      <div class="grid-2">
+        <!-- Left: Holidays and Closed Days -->
+        <div class="card">
+          <div class="card-title">
+            <span>🚩 공휴일 및 임시 휴무일 지정</span>
+          </div>
+          <p class="card-description">
+            해당 연월의 주말(토, 일)은 자동 제외됩니다. 대한민국 법정 공휴일이 자동 반영되며, 사업단 사정에 따른 임시 휴무일을 추가/해제할 수 있습니다.
+          </p>
+          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <input type="date" id="newHolidayDate" class="input" style="flex: 1;">
+            <input type="text" id="newHolidayReason" class="input" placeholder="휴무 사유 (예: 센터 창립기념일)" style="flex: 2;">
+            <button class="btn btn-teal btn-sm" onclick="addCustomHoliday()">+ 휴무일 등록</button>
+          </div>
+          <div id="holidayListContainer" style="display: flex; flex-direction: column; gap: 6px;"></div>
+        </div>
+
+        <!-- Right: Monthly Individual Unavailable Days -->
+        <div class="card">
+          <div class="card-title">
+            <span>🚫 참여자별 이번 달 참여 불가 날짜 등록</span>
+          </div>
+          <p class="card-description">
+            병원 진료, 개인 사정 등으로 배정받을 수 없는 날짜를 지정합니다. 자동 및 수동 편성 시 절대 배정되지 않습니다.
+          </p>
+          <div style="margin-bottom: 12px;">
+            <label style="font-weight: 600; font-size: 13px;">참여자 선택:</label>
+            <select id="unavailablePersonSelect" class="select" style="width: 100%; margin-top: 4px;" onchange="renderUnavailableDates()"></select>
+          </div>
+          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <input type="date" id="newUnavailableDate" class="input" style="flex: 1;">
+            <button class="btn btn-ghost btn-sm" onclick="addUnavailableDateForSelected()">+ 날짜 추가</button>
+          </div>
+          <div id="selectedPersonUnavailableList" style="display: flex; flex-wrap: wrap; gap: 6px; min-height: 40px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 5: 확정 및 엑셀 다운로드 -->
+    <!-- ========================================== -->
+    <section id="tab-export" class="tab-content" style="display: none;">
+      <div class="card">
+        <div class="card-title">
+          <span>💾 근무표 최종 확정 및 엑셀 출력</span>
+          <span id="finalConfirmStatus" class="chip">초안 상태</span>
+        </div>
+        <p class="card-description">
+          편성된 근무표를 최종 확정하고, 전체 배포용 엑셀 1부 및 참여자 18명에게 각각 전달할 개인별 엑셀(또는 ZIP 일괄 압축) 파일을 내려받습니다.
+        </p>
+
+        <div class="grid-2" style="margin-bottom: 24px;">
+          <!-- Whole Schedule Export -->
+          <div style="border: 1px solid var(--color-warm-mist); border-radius: 12px; padding: 20px; background: var(--color-parchment);">
+            <h3 style="font-size: 16px; margin-bottom: 8px;">📑 전체 근무표 엑셀 파일</h3>
+            <p style="color: var(--color-graphite); font-size: 13px; margin-bottom: 16px;">
+              - 파일명: <code>남부그린팝_전체근무표_YYYY-MM.xlsx</code><br>
+              - 시트 1: 월간 전체 일정표 (날짜별 오전/오후 역할 배정표)<br>
+              - 시트 2: 참여자별 배정 통계 및 우선권 이력
+            </p>
+            <button class="btn btn-teal" style="width: 100%;" onclick="downloadWholeExcel()">📥 전체 근무표 엑셀 다운로드</button>
+          </div>
+
+          <!-- Individual Schedule Export -->
+          <div style="border: 1px solid var(--color-warm-mist); border-radius: 12px; padding: 20px; background: var(--color-parchment);">
+            <h3 style="font-size: 16px; margin-bottom: 8px;">👤 개인별 배부용 근무표 (18명 ZIP 압축)</h3>
+            <p style="color: var(--color-graphite); font-size: 13px; margin-bottom: 16px;">
+              - 파일명: <code>남부그린팝_개인근무표_YYYY-MM_일괄.zip</code><br>
+              - 참여자 본인의 일정, 요일, 시간, 담당 역할만 포함 (개인정보 보호)<br>
+              - 18개 개별 엑셀 파일을 ZIP 하나로 묶어 바로 다운로드
+            </p>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-primary" style="flex: 1;" onclick="downloadIndividualZip()">📦 전체 개인별 ZIP 다운로드</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="border-top: 1px solid var(--color-warm-mist); padding-top: 16px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <strong>근무표 확정 상태:</strong>
+            <span id="confirmInfoText" style="color: var(--color-graphite); margin-left: 6px;">현재 초안 상태입니다.</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-teal" id="btnConfirmSchedule" onclick="confirmCurrentSchedule()">🔒 현재 근무표 최종 확정</button>
+            <button class="btn btn-ghost" id="btnUnconfirmSchedule" onclick="unconfirmCurrentSchedule()" style="display: none;">🔓 확정 해제 (수정 모드)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Individual Preview Table -->
+      <div class="card">
+        <div class="card-title">
+          <span>👀 개인별 근무표 미리보기 및 1인 다운로드</span>
+          <select id="previewPersonSelect" class="select" onchange="renderIndividualPreview()"></select>
+        </div>
+        <div id="individualPreviewContainer" class="table-container">
+          <!-- Dynamically populated -->
+        </div>
+        <div style="margin-top: 12px; text-align: right;">
+          <button class="btn btn-ghost btn-sm" onclick="downloadSingleIndividualExcel()">📥 선택된 참여자 엑셀 1부 다운로드</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal: Participant Edit/Add -->
+  <div id="participantModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalParticipantTitle" style="font-size: 16px;">참여자 정보</h3>
+        <button class="modal-close" onclick="closeParticipantModal()">&times;</button>
+      </div>
+      <form id="participantForm" onsubmit="saveParticipantModal(event)">
+        <div style="margin-bottom: 12px;">
+          <label style="font-weight: 600; display: block; margin-bottom: 4px;">참여자 ID</label>
+          <input type="text" id="formPartId" class="input" style="width: 100%;" required>
+        </div>
+        <div style="margin-bottom: 12px;">
+          <label style="font-weight: 600; display: block; margin-bottom: 4px;">표시 이름</label>
+          <input type="text" id="formPartName" class="input" style="width: 100%;" required>
+        </div>
+        <div style="margin-bottom: 12px;">
+          <label style="font-weight: 600; display: block; margin-bottom: 4px;">근무반</label>
+          <select id="formPartShift" class="select" style="width: 100%;">
+            <option value="오전">오전반 (09:30~12:30)</option>
+            <option value="오후">오후반 (13:00~16:00)</option>
+          </select>
+        </div>
+        <div style="margin-bottom: 12px;">
+          <label style="font-weight: 600; display: block; margin-bottom: 4px;">고정 희망 요일</label>
+          <div style="display: flex; gap: 8px;">
+            <label><input type="checkbox" name="formDays" value="월"> 월</label>
+            <label><input type="checkbox" name="formDays" value="화"> 화</label>
+            <label><input type="checkbox" name="formDays" value="수"> 수</label>
+            <label><input type="checkbox" name="formDays" value="목"> 목</label>
+            <label><input type="checkbox" name="formDays" value="금"> 금</label>
+          </div>
+        </div>
+        <div class="grid-3" style="margin-bottom: 16px;">
+          <div>
+            <label style="font-weight: 600; display: block; margin-bottom: 4px;">판매 역할</label>
+            <select id="formRoleSale" class="select" style="width: 100%;">
+              <option value="선호">선호</option>
+              <option value="가능">가능</option>
+              <option value="불가">불가</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-weight: 600; display: block; margin-bottom: 4px;">생산 역할</label>
+            <select id="formRoleProduce" class="select" style="width: 100%;">
+              <option value="선호">선호</option>
+              <option value="가능">가능</option>
+              <option value="불가">불가</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-weight: 600; display: block; margin-bottom: 4px;">기계 역할</label>
+            <select id="formRoleMachine" class="select" style="width: 100%;">
+              <option value="선호">선호</option>
+              <option value="가능">가능</option>
+              <option value="불가">불가</option>
+            </select>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" class="btn btn-ghost" onclick="closeParticipantModal()">취소</button>
+          <button type="submit" class="btn btn-teal">저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    /* =====================================================================
+       1. DATA STRUCTURES & DEFAULT 18 PARTICIPANTS (PRD 3.1 & 6.1)
+       ===================================================================== */
+    const STORAGE_KEY_PARTICIPANTS = 'nambu_greenpop_participants_v1';
+    const STORAGE_KEY_SETTINGS = 'nambu_greenpop_settings_v1';
+    const STORAGE_KEY_SCHEDULES = 'nambu_greenpop_schedules_v1';
+
+    // 18 Initial Participants optimized for the shifts
+    // Morning AM: 5 members (AM Sale max 2/day -> ~10 slots/wk, 40 slots/mo -> 5 * 8 = 40 perfect)
+    // Afternoon PM: 13 members (PM Slots Mon-Thu 7, Fri 2 -> 30 slots/wk, 120 slots/mo -> 13 * 8 = 104 slots needed)
+    const DEFAULT_PARTICIPANTS = [
+      // 오전반 5명 (판매 전담)
+      { id: 'P01', name: '김순자', shift: '오전', days: ['월', '화', '목'], sale: '선호', produce: '불가', machine: '불가', prevShortage: 0, prevPriorityUsed: 0 },
+      { id: 'P02', name: '이영희', shift: '오전', days: ['화', '수', '금'], sale: '선호', produce: '불가', machine: '불가', prevShortage: 0, prevPriorityUsed: 0 },
+      { id: 'P03', name: '박정숙', shift: '오전', days: ['월', '수', '목'], sale: '선호', produce: '불가', machine: '불가', prevShortage: 0, prevPriorityUsed: 0 },
+      { id: 'P04', name: '최옥순', shift: '오전', days: ['화', '목', '금'], sale: '선호', produce: '불가', machine: '불가', prevShortage: 0, prevPriorityUsed: 0 },
+      { id: 'P05', name: '정명자', shift: '오전', days: ['월', '수', '금'], sale: '선호', produce: '불가', machine: '불가', prevShortage: 0, prevPriorityUsed: 0 },
+
+      // 오후반 13명 (기계 가능자 3명, 판매/생산 분담)
+      { id: 'P06', name: '강철수', shift: '오후', days: ['월', '화', '수', '목'], sale: '가능', produce: '가능', machine: '선호', prevShortage: 0, prevPriorityUsed: 0 },
+      { id: 'P07', name: '조기계', shift: '오후', days: ['월', '화', '목', '금'], sale: '가능', produce: '선호', machine: '가능', prevShortage: 0, prevPriorityUsed: 0 },
+      { id: 'P08', name: '윤기술', shift: '오후', days: ['화', '수', '목'], sale: '불가', produce: '선호', machine: '선호', prevShortage: 0, prevPriorityUsed: 0 },
+      { id: 'P09', name: '장영자', shift: '오후', days: ['월', '화', '금'], sale: '선호', produce: '가능', machine: '불가', prevShortage: 0, prevPriorityUsed: 0 },
+      { id: 'P10', name: '임순희', shift: '오후', days: ['수', '목', '금'], sale: '선호', produce: '가능', machine: '불가', prevShortage: 0, prevPriorityUsed: 0 },
+      { id: 'P11', name: '한숙자', shift: '오후', days: ['월', '수', '목'], sale: '가능', produce: '선호', machine: '불가', prevShortage: 0, prevPriorityUsed: 0 },
+      { id: 'P12', name: '오경자', shift: '오후', days: ['화', '수', '목'], sale: '가능', produce: '선호', machine: '불가', prevShortage: 0, prevPriorityUsed: 0 },
+      { id: 'P13', name: '서봉수', shift: '오후', days: ['월', '화', '수'], sale: '가능', produce: '선호', machine: '불가', prevShortage: 0, prevPriorityUsed: 0 },
+      { id: 'P14', name: '배점순', shift: '오후', days: ['화', '목', '금'], sale: '선호', produce: '선호', machine: '불가', prevShortage: 0, prevPriorityUsed: 0 },
+      { id: 'P15', name: '백만석', shift: '오후', days: ['월', '수', '목'], sale: '가능', produce: '선호', machine: '가능', prevShortage: 0, prevPriorityUsed: 0 },
+      { id: 'P16', name: '권복례', shift: '오후', days: ['화', '수', '금'], sale: '선호', produce: '선호', machine: '불가', prevShortage: 0, prevPriorityUsed: 0 },
+      { id: 'P17', name: '신현자', shift: '오후', days: ['월', '목', '금'], sale: '선호', produce: '선호', machine: '불가', prevShortage: 0, prevPriorityUsed: 0 },
+      { id: 'P18', name: '황보선', shift: '오후', days: ['월', '화', '목'], sale: '선호', produce: '선호', machine: '불가', prevShortage: 0, prevPriorityUsed: 0 }
+    ];
+
+    let participants = [];
+    let currentSchedule = {}; // dateStr -> { am: [ {id, role} ], pm: [ {id, role} ] }
+    let scheduleMetadata = { status: 'draft', confirmedAt: null, seed: 1 };
+    let monthlySettings = {
+      holidays: {}, // 'YYYY-MM-DD' -> '사유'
+      unavailable: {} // personId -> ['YYYY-MM-DD', ...]
+    };
+
+    /* =====================================================================
+       2. INITIALIZATION & STORAGE
+       ===================================================================== */
+    function init() {
+      // 1. Load participants
+      const savedParts = localStorage.getItem(STORAGE_KEY_PARTICIPANTS);
+      if (savedParts) {
+        try {
+          participants = JSON.parse(savedParts);
+        } catch (e) {
+          participants = [...DEFAULT_PARTICIPANTS];
+        }
+      } else {
+        participants = [...DEFAULT_PARTICIPANTS];
+        saveParticipants();
+      }
+
+      // 2. Set current or target month
+      const now = new Date();
+      // Default to next month if end of month, or current month
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const targetInput = document.getElementById('targetYearMonth');
+      targetInput.value = `${y}-${m}`;
+
+      loadMonthData(`${y}-${m}`);
+      renderAll();
+    }
+
+    function saveParticipants() {
+      localStorage.setItem(STORAGE_KEY_PARTICIPANTS, JSON.stringify(participants));
+      document.getElementById('participantCount').innerText = participants.length;
+    }
+
+    function saveMonthSchedule(ym) {
+      const allSchedules = JSON.parse(localStorage.getItem(STORAGE_KEY_SCHEDULES) || '{}');
+      allSchedules[ym] = {
+        schedule: currentSchedule,
+        metadata: scheduleMetadata
+      };
+      localStorage.setItem(STORAGE_KEY_SCHEDULES, JSON.stringify(allSchedules));
+    }
+
+    function loadMonthData(ym) {
+      // Load Settings (holidays & unavailable)
+      const allSettings = JSON.parse(localStorage.getItem(STORAGE_KEY_SETTINGS) || '{}');
+      monthlySettings = allSettings[ym] || { holidays: {}, unavailable: {} };
+
+      // Initialize default Korean statutory holidays if not already set
+      initDefaultKoreanHolidays(ym);
+
+      // Load Schedules
+      const allSchedules = JSON.parse(localStorage.getItem(STORAGE_KEY_SCHEDULES) || '{}');
+      if (allSchedules[ym]) {
+        currentSchedule = allSchedules[ym].schedule || {};
+        scheduleMetadata = allSchedules[ym].metadata || { status: 'draft', confirmedAt: null };
+      } else {
+        currentSchedule = {};
+        scheduleMetadata = { status: 'draft', confirmedAt: null, seed: Math.floor(Math.random()*1000) };
+      }
+    }
+
+    function initDefaultKoreanHolidays(ym) {
+      const [yearStr, monthStr] = ym.split('-');
+      const y = parseInt(yearStr);
+      const m = parseInt(monthStr);
+
+      // Known Fixed Holidays
+      const fixed = {
+        '01-01': '신정',
+        '03-01': '3·1절',
+        '05-05': '어린이날',
+        '06-06': '현충일',
+        '08-15': '광복절',
+        '10-03': '개천절',
+        '10-09': '한글날',
+        '12-25': '성탄절'
+      };
+
+      // Lunar approximations & standard replacement holidays for recent years
+      const specialHolidays = {
+        '2026-02-16': '설날 연휴', '2026-02-17': '설날', '2026-02-18': '설날 연휴',
+        '2026-05-24': '부처님오신날', '2026-05-25': '대체공휴일',
+        '2026-09-24': '추석 연휴', '2026-09-25': '추석', '2026-09-26': '추석 연휴',
+        '2026-10-05': '개천절 대체공휴일'
+      };
+
+      // Populate if not exists
+      for (const [key, name] of Object.entries(fixed)) {
+        const [fm, fd] = key.split('-');
+        if (parseInt(fm) === m) {
+          const fullKey = `${yearStr}-${key}`;
+          if (!monthlySettings.holidays[fullKey]) {
+            monthlySettings.holidays[fullKey] = name;
+          }
+        }
+      }
+
+      for (const [dateStr, name] of Object.entries(specialHolidays)) {
+        if (dateStr.startsWith(ym) && !monthlySettings.holidays[dateStr]) {
+          monthlySettings.holidays[dateStr] = name;
+        }
+      }
+    }
+
+    function saveSettings() {
+      const ym = document.getElementById('targetYearMonth').value;
+      const allSettings = JSON.parse(localStorage.getItem(STORAGE_KEY_SETTINGS) || '{}');
+      allSettings[ym] = monthlySettings;
+      localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(allSettings));
+    }
+
+    function onMonthChanged() {
+      const ym = document.getElementById('targetYearMonth').value;
+      loadMonthData(ym);
+      renderAll();
+    }
+
+    /* =====================================================================
+       3. OPERATIONAL DATES & CONSTRAINTS (PRD 3.1 & 3.2)
+       ===================================================================== */
+    function getOperatingDays(ym) {
+      const [year, month] = ym.split('-').map(Number);
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const operatingDays = [];
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateObj = new Date(year, month - 1, day);
+        const dayOfWeek = dateObj.getDay(); // 0: Sun, 1: Mon, ..., 5: Fri, 6: Sat
+        const dayName = ['일', '월', '화', '수', '목', '금', '토'][dayOfWeek];
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+        const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+        const isHoliday = !!monthlySettings.holidays[dateStr];
+        const holidayName = monthlySettings.holidays[dateStr] || '';
+
+        operatingDays.push({
+          dateStr,
+          day,
+          dayOfWeek,
+          dayName,
+          isWeekend,
+          isHoliday,
+          holidayName,
+          isOperating: !isWeekend && !isHoliday,
+          isFriday: (dayOfWeek === 5)
+        });
+      }
+
+      return operatingDays;
+    }
+
+    /* =====================================================================
+       4. AUTO SCHEDULING ALGORITHM (PRD Section 4)
+       ===================================================================== */
+    function runAutoSchedule() {
+      const ym = document.getElementById('targetYearMonth').value;
+      const opDays = getOperatingDays(ym).filter(d => d.isOperating);
+
+      if (opDays.length === 0) {
+        alert('선택한 월에 운영일(평일 근무일)이 없습니다. 공휴일 설정을 확인해주세요.');
+        return;
+      }
+
+      // Initialize empty schedule structure
+      const newSchedule = {};
+      opDays.forEach(d => {
+        newSchedule[d.dateStr] = {
+          am: [], // up to 2: { id, role: '판매' }
+          pm: []  // Mon-Thu: up to 1 Machine, 2 Sale, 4 Produce (total 7). Fri: 2 Sale
+        };
+      });
+
+      // Target count tracker: personId -> assigned count (target max 8)
+      const assignedCounts = {};
+      participants.forEach(p => assignedCounts[p.id] = 0);
+
+      // Build daily applicant candidate pools
+      // Helper: check if person is eligible for a slot on dateStr
+      function canParticipate(person, opDay, shift, role) {
+        if (assignedCounts[person.id] >= 8) return false;
+        if (person.shift !== shift) return false;
+        if (!person.days.includes(opDay.dayName)) return false;
+
+        // Check unavailable dates
+        const unavList = monthlySettings.unavailable[person.id] || [];
+        if (unavList.includes(opDay.dateStr)) return false;
+
+        // Check role restriction
+        if (role === '판매' && person.sale === '불가') return false;
+        if (role === '생산' && person.produce === '불가') return false;
+        if (role === '기계' && person.machine === '불가') return false;
+
+        // Check if already assigned on that date
+        const dayPlan = newSchedule[opDay.dateStr];
+        const alreadyInDay = [...dayPlan.am, ...dayPlan.pm].some(a => a.id === person.id);
+        if (alreadyInDay) return false;
+
+        return true;
+      }
+
+      // Priority Comparator (PRD 4.4):
+      // 1) Current month assigned count (ascending - fewest first)
+      // 2) Previous month shortage from competition (descending - highest first)
+      // 3) Previous priority used count (ascending - lowest first)
+      // 4) Role preference ('선호' > '가능')
+      // 5) Monthly round-robin tie breaker
+      function getScore(person, role) {
+        const assigned = assignedCounts[person.id];
+        const prevShortage = person.prevShortage || 0;
+        const prevPriority = person.prevPriorityUsed || 0;
+        const rolePref = (role === '기계' ? person.machine : (role === '생산' ? person.produce : person.sale));
+        const prefScore = rolePref === '선호' ? 10 : 0;
+        
+        // Cyclic monthly rotation score
+        const monthNum = parseInt(ym.split('-')[1]);
+        const idNum = parseInt(person.id.replace(/\D/g, '')) || 0;
+        const cycleScore = (idNum + monthNum) % 18;
+
+        return {
+          assigned,
+          prevShortage,
+          prevPriority,
+          prefScore,
+          cycleScore,
+          id: person.id
+        };
+      }
+
+      function sortCandidates(list, role) {
+        return [...list].sort((a, b) => {
+          const sa = getScore(a, role);
+          const sb = getScore(b, role);
+          if (sa.assigned !== sb.assigned) return sa.assigned - sb.assigned;
+          if (sa.prevShortage !== sb.prevShortage) return sb.prevShortage - sa.prevShortage;
+          if (sa.prevPriority !== sb.prevPriority) return sa.prevPriority - sb.prevPriority;
+          if (sa.prefScore !== sb.prefScore) return sb.prefScore - sa.prefScore;
+          return sa.cycleScore - sb.cycleScore;
+        });
+      }
+
+      // PHASE 1: Essential Slots Allocation (PRD 4.3 & 3.2)
+      // Morning Essential: 1 Sale on all operating days
+      opDays.forEach(opDay => {
+        const candidates = participants.filter(p => canParticipate(p, opDay, '오전', '판매'));
+        const sorted = sortCandidates(candidates, '판매');
+        if (sorted.length > 0) {
+          const pick = sorted[0];
+          newSchedule[opDay.dateStr].am.push({ id: pick.id, role: '판매' });
+          assignedCounts[pick.id]++;
+        }
+      });
+
+      // Afternoon Essential:
+      // Mon-Thu: 1 Sale, 1 Produce
+      // Friday: 1 Sale
+      opDays.forEach(opDay => {
+        // Essential 1: PM Sale
+        const saleCandidates = participants.filter(p => canParticipate(p, opDay, '오후', '판매'));
+        const sortedSale = sortCandidates(saleCandidates, '판매');
+        if (sortedSale.length > 0) {
+          const pick = sortedSale[0];
+          newSchedule[opDay.dateStr].pm.push({ id: pick.id, role: '판매' });
+          assignedCounts[pick.id]++;
+        }
+
+        // Essential 2: PM Produce (Mon-Thu only)
+        if (!opDay.isFriday) {
+          const produceCandidates = participants.filter(p => canParticipate(p, opDay, '오후', '생산'));
+          const sortedProduce = sortCandidates(produceCandidates, '생산');
+          if (sortedProduce.length > 0) {
+            const pick = sortedProduce[0];
+            newSchedule[opDay.dateStr].pm.push({ id: pick.id, role: '생산' });
+            assignedCounts[pick.id]++;
+          }
+        }
+      });
+
+      // PHASE 2: Fill Machine Slots (Mon-Thu only, max 1)
+      opDays.forEach(opDay => {
+        if (!opDay.isFriday) {
+          const machineCandidates = participants.filter(p => canParticipate(p, opDay, '오후', '기계'));
+          const sorted = sortCandidates(machineCandidates, '기계');
+          if (sorted.length > 0) {
+            const pick = sorted[0];
+            newSchedule[opDay.dateStr].pm.push({ id: pick.id, role: '기계' });
+            assignedCounts[pick.id]++;
+          }
+        }
+      });
+
+      // PHASE 3: Fill Remaining Capacity towards 8 Target
+      // Morning Sale 2nd Slot (max 2)
+      opDays.forEach(opDay => {
+        if (newSchedule[opDay.dateStr].am.length < 2) {
+          const candidates = participants.filter(p => canParticipate(p, opDay, '오전', '판매'));
+          const sorted = sortCandidates(candidates, '판매');
+          if (sorted.length > 0) {
+            const pick = sorted[0];
+            newSchedule[opDay.dateStr].am.push({ id: pick.id, role: '판매' });
+            assignedCounts[pick.id]++;
+          }
+        }
+      });
+
+      // Afternoon Remaining Slots (Mon-Thu: Sale up to 2, Produce up to 4; Friday: Sale up to 2)
+      opDays.forEach(opDay => {
+        const pmAssigned = newSchedule[opDay.dateStr].pm;
+
+        // PM Sale Slot 2
+        const currentPmSale = pmAssigned.filter(a => a.role === '판매').length;
+        if (currentPmSale < 2) {
+          const candidates = participants.filter(p => canParticipate(p, opDay, '오후', '판매'));
+          const sorted = sortCandidates(candidates, '판매');
+          if (sorted.length > 0) {
+            const pick = sorted[0];
+            newSchedule[opDay.dateStr].pm.push({ id: pick.id, role: '판매' });
+            assignedCounts[pick.id]++;
+          }
+        }
+
+        // PM Produce Slots 2~4 (Mon-Thu only)
+        if (!opDay.isFriday) {
+          while (pmAssigned.filter(a => a.role === '생산').length < 4) {
+            const candidates = participants.filter(p => canParticipate(p, opDay, '오후', '생산'));
+            const sorted = sortCandidates(candidates, '생산');
+            if (sorted.length === 0) break;
+            const pick = sorted[0];
+            newSchedule[opDay.dateStr].pm.push({ id: pick.id, role: '생산' });
+            assignedCounts[pick.id]++;
+          }
+        }
+      });
+
+      currentSchedule = newSchedule;
+      scheduleMetadata = {
+        status: 'draft',
+        confirmedAt: null,
+        executedAt: new Date().toISOString()
+      };
+
+      saveMonthSchedule(ym);
+      renderAll();
+      showBanner('success', '✨ 희망 요일 및 운영 제약조건을 기반으로 월간 근무표 자동 편성이 완료되었습니다.');
+    }
+
+    function resetToAutoSchedulePrompt() {
+      if (confirm('현재 편집 중인 근무표를 초기화하시겠습니까?')) {
+        const ym = document.getElementById('targetYearMonth').value;
+        currentSchedule = {};
+        scheduleMetadata = { status: 'draft', confirmedAt: null };
+        saveMonthSchedule(ym);
+        renderAll();
+        showBanner('info', '근무표가 초기화되었습니다. [자동 편성 실행]을 눌러 새로 편성할 수 있습니다.');
+      }
+    }
+
+    /* =====================================================================
+       5. ANALYSIS, SHORTAGE & RECOMMENDATION (PRD Section 5)
+       ===================================================================== */
+    function analyzeSchedule() {
+      const ym = document.getElementById('targetYearMonth').value;
+      const opDays = getOperatingDays(ym);
+      const opDaysOnly = opDays.filter(d => d.isOperating);
+
+      const counts = {};
+      const personDays = {};
+      participants.forEach(p => {
+        counts[p.id] = 0;
+        personDays[p.id] = [];
+      });
+
+      // Count assignments
+      Object.entries(currentSchedule).forEach(([dateStr, dayPlan]) => {
+        [...dayPlan.am, ...dayPlan.pm].forEach(a => {
+          if (counts[a.id] !== undefined) {
+            counts[a.id]++;
+            personDays[a.id].push({ dateStr, role: a.role });
+          }
+        });
+      });
+
+      // Identify shortages and reasons
+      const analysis = participants.map(p => {
+        const assigned = counts[p.id] || 0;
+        const shortage = Math.max(0, 8 - assigned);
+
+        // Analyze reason if shortage exists
+        let reasons = [];
+        if (shortage > 0) {
+          const unavCount = (monthlySettings.unavailable[p.id] || []).length;
+          if (unavCount >= 4) reasons.push('개인 불가 날짜 많음');
+          if (p.days.length <= 2) reasons.push('희망 요일 수 적음');
+          if (p.shift === '오전' && p.sale === '불가') reasons.push('오전반이나 판매 역할 불가');
+          if (p.shift === '오후' && p.sale === '불가' && p.produce === '불가') reasons.push('오후반 주요 역할 불가');
+          if (reasons.length === 0) reasons.push('희망 요일 경쟁 슬롯 부족');
+        }
+
+        // Recommend additional assignable dates
+        // Find operating days where this person CAN be assigned
+        const recommendedDates = [];
+        if (shortage > 0) {
+          opDaysOnly.forEach(opDay => {
+            const dateStr = opDay.dateStr;
+            const alreadyAssigned = personDays[p.id].some(d => d.dateStr === dateStr);
+            if (alreadyAssigned) return;
+
+            const unavList = monthlySettings.unavailable[p.id] || [];
+            if (unavList.includes(dateStr)) return;
+
+            const dayPlan = currentSchedule[dateStr] || { am: [], pm: [] };
+            const isPrefDay = p.days.includes(opDay.dayName);
+
+            if (p.shift === '오전') {
+              // AM Sale slot check (max 2)
+              if (dayPlan.am.length < 2 && p.sale !== '불가') {
+                recommendedDates.push({
+                  dateStr,
+                  dayName: opDay.dayName,
+                  shift: '오전',
+                  role: '판매',
+                  isPrefDay,
+                  remaining: 2 - dayPlan.am.length
+                });
+              }
+            } else {
+              // PM Check
+              // 1. PM Machine (Mon-Thu only, max 1)
+              if (!opDay.isFriday && p.machine !== '불가' && !dayPlan.pm.some(a => a.role === '기계')) {
+                recommendedDates.push({
+                  dateStr,
+                  dayName: opDay.dayName,
+                  shift: '오후',
+                  role: '기계',
+                  isPrefDay,
+                  remaining: 1
+                });
+              }
+              // 2. PM Sale (max 2)
+              const saleCount = dayPlan.pm.filter(a => a.role === '판매').length;
+              if (saleCount < 2 && p.sale !== '불가') {
+                recommendedDates.push({
+                  dateStr,
+                  dayName: opDay.dayName,
+                  shift: '오후',
+                  role: '판매',
+                  isPrefDay,
+                  remaining: 2 - saleCount
+                });
+              }
+              // 3. PM Produce (Mon-Thu only, max 4)
+              if (!opDay.isFriday) {
+                const prodCount = dayPlan.pm.filter(a => a.role === '생산').length;
+                if (prodCount < 4 && p.produce !== '불가') {
+                  recommendedDates.push({
+                    dateStr,
+                    dayName: opDay.dayName,
+                    shift: '오후',
+                    role: '생산',
+                    isPrefDay,
+                    remaining: 4 - prodCount
+                  });
+                }
+              }
+            }
+          });
+        }
+
+        return {
+          participant: p,
+          assigned,
+          shortage,
+          reasons: reasons.join(', '),
+          recommendedDates
+        };
+      });
+
+      return {
+        counts,
+        personDays,
+        analysis,
+        opDaysOnly
+      };
+    }
+
+    /* =====================================================================
+       6. RENDERING FUNCTIONS
+       ===================================================================== */
+    let currentScheduleViewMode = 'table'; // 'table' or 'calendar'
+
+    function renderAll() {
+      const ym = document.getElementById('targetYearMonth').value;
+      const opDays = getOperatingDays(ym);
+      const opDaysOnly = opDays.filter(d => d.isOperating);
+
+      document.getElementById('currentViewMonthText').innerText = ym;
+      document.getElementById('targetMonthStats').innerText = `총 ${opDays.length}일 중 근무 운영일 ${opDaysOnly.length}일`;
+
+      // Status Badge
+      const statusBadge = document.getElementById('scheduleStateBadge');
+      if (scheduleMetadata.status === 'confirmed') {
+        statusBadge.className = 'chip chip-teal';
+        statusBadge.innerText = '확정됨 (' + (scheduleMetadata.confirmedAt ? scheduleMetadata.confirmedAt.substring(0, 10) : '') + ')';
+        document.getElementById('finalConfirmStatus').className = 'chip chip-teal';
+        document.getElementById('finalConfirmStatus').innerText = '최종 확정 완료';
+        document.getElementById('confirmInfoText').innerText = '현재 확정 상태입니다. 개인표 배부 및 엑셀 다운로드가 가능합니다.';
+        document.getElementById('btnConfirmSchedule').style.display = 'none';
+        document.getElementById('btnUnconfirmSchedule').style.display = 'inline-flex';
+      } else {
+        statusBadge.className = 'chip';
+        statusBadge.innerText = '초안 (편집 가능)';
+        document.getElementById('finalConfirmStatus').className = 'chip';
+        document.getElementById('finalConfirmStatus').innerText = '초안 상태';
+        document.getElementById('confirmInfoText').innerText = '현재 초안 상태입니다. 자동 편성 및 수동 검토 후 확정해주세요.';
+        document.getElementById('btnConfirmSchedule').style.display = 'inline-flex';
+        document.getElementById('btnUnconfirmSchedule').style.display = 'none';
+      }
+
+      // Analyze
+      const { counts, analysis } = analyzeSchedule();
+
+      // Stats
+      const totalAssigned = Object.values(counts).reduce((a, b) => a + b, 0);
+      document.getElementById('statTotalTarget').innerText = `${participants.length * 8}회`;
+      document.getElementById('statAssignedTotal').innerText = `현재 배정: ${totalAssigned}회 (${Math.round((totalAssigned / (participants.length * 8 || 1)) * 100)}%)`;
+
+      const fullPeople = analysis.filter(a => a.assigned >= 8).length;
+      document.getElementById('statTargetFullPeople').innerText = `${fullPeople} / ${participants.length}명`;
+      const shortPeople = analysis.filter(a => a.shortage > 0).length;
+      document.getElementById('statShortagePeople').innerText = `부족 인원: ${shortPeople}명`;
+      document.getElementById('statShortagePeople').style.color = shortPeople > 0 ? '#c53030' : 'var(--color-graphite)';
+
+      // Check Essential Requirements
+      let essentialDeficit = 0;
+      let machineEmptyCount = 0;
+      let monThuCount = 0;
+
+      opDaysOnly.forEach(d => {
+        const plan = currentSchedule[d.dateStr] || { am: [], pm: [] };
+        if (plan.am.length < 1) essentialDeficit++; // Morning sale min 1
+        const pmSale = plan.pm.filter(a => a.role === '판매').length;
+        if (pmSale < 1) essentialDeficit++;
+
+        if (!d.isFriday) {
+          monThuCount++;
+          const pmProd = plan.pm.filter(a => a.role === '생산').length;
+          if (pmProd < 1) essentialDeficit++;
+          const pmMachine = plan.pm.filter(a => a.role === '기계').length;
+          if (pmMachine < 1) machineEmptyCount++;
+        }
+      });
+
+      const essentialRate = opDaysOnly.length > 0 
+        ? Math.max(0, Math.round(((opDaysOnly.length * 2 - essentialDeficit) / (opDaysOnly.length * 2)) * 100))
+        : 100;
+      document.getElementById('statEssentialRate').innerText = `${essentialRate}%`;
+      document.getElementById('statEssentialRate').style.color = essentialDeficit > 0 ? '#c53030' : 'var(--color-ink)';
+
+      document.getElementById('statMachineStatus').innerText = `${monThuCount - machineEmptyCount} / ${monThuCount}일 배정`;
+
+      // Warnings
+      renderWarnings(essentialDeficit, machineEmptyCount, shortPeople);
+
+      // Render Active Tab Content
+      renderScheduleTable(opDays);
+      renderScheduleCalendar(opDays);
+      renderShortageTable(analysis);
+      renderParticipantTable();
+      renderHolidaysList();
+      populateSelectOptions();
+      renderUnavailableDates();
+      renderIndividualPreview();
+      onManualDateSelected();
+    }
+
+    function renderWarnings(essentialDeficit, machineEmptyCount, shortPeople) {
+      const container = document.getElementById('scheduleWarningList');
+      container.innerHTML = '';
+
+      if (essentialDeficit > 0) {
+        container.innerHTML += `
+          <div class="alert-box alert-danger">
+            ⚠️ <strong>필수 인원 미달 알림:</strong> 운영일 중 오전 판매 1명 또는 오후 판매1/생산1 필수 자리가 비어 있는 날이 ${essentialDeficit}건 있습니다.
+          </div>
+        `;
+      }
+      if (machineEmptyCount > 0) {
+        container.innerHTML += `
+          <div class="alert-box alert-warning">
+            ℹ️ <strong>기계 역할 공석 안내:</strong> 월~목 중 기계 담당이 미배정된 날이 ${machineEmptyCount}일 있습니다. (운영 규칙: 기계 공석 시 임의 강제 배정하지 않으며, <em>당일 생산 참여자와 협의하여 운영</em>합니다.)
+          </div>
+        `;
+      }
+      if (shortPeople > 0) {
+        container.innerHTML += `
+          <div class="alert-box alert-info">
+            💡 <strong>희망 요일 외 추가 배정 필요:</strong> 총 ${shortPeople}명의 참여자가 고정 희망 요일 내 슬롯 부족으로 월 8회를 채우지 못했습니다. [수동조정·추천] 탭에서 추천 날짜로 손쉽게 추가할 수 있습니다.
+          </div>
+        `;
+      }
+    }
+
+    function getPersonName(id) {
+      const p = participants.find(x => x.id === id);
+      return p ? p.name : id;
+    }
+
+    /* 6.1 Schedule Table Render */
+    function renderScheduleTable(opDays) {
+      const tbody = document.getElementById('scheduleTableBody');
+      tbody.innerHTML = '';
+
+      opDays.forEach(d => {
+        const plan = currentSchedule[d.dateStr] || { am: [], pm: [] };
+        const tr = document.createElement('tr');
+
+        if (!d.isOperating) {
+          tr.style.backgroundColor = d.isWeekend ? '#fbf9f6' : '#fff5f5';
+          tr.style.color = 'var(--color-ash)';
+        }
+
+        const dateCol = `
+          <strong>${d.dateStr.substring(5)}</strong> (${d.dayName})
+          ${d.isHoliday ? `<div class="chip chip-danger" style="font-size:10px; margin-top:2px;">${d.holidayName}</div>` : ''}
+          ${d.isWeekend ? `<div class="chip" style="font-size:10px; margin-top:2px;">주말</div>` : ''}
+        `;
+
+        const typeCol = d.isOperating ? (d.isFriday ? `<span class="chip chip-teal">금 (판매만)</span>` : `<span class="chip">월~목</span>`) : `<span class="chip">휴무</span>`;
+
+        if (!d.isOperating) {
+          tr.innerHTML = `
+            <td>${dateCol}</td>
+            <td>${typeCol}</td>
+            <td colspan="5" style="text-align: center; color: var(--color-graphite); font-size: 12px;">근무 없음 (${d.holidayName || '휴무일'})</td>
+            <td>-</td>
+          `;
+          tbody.appendChild(tr);
+          return;
+        }
+
+        // AM Sale
+        const amSale = plan.am.filter(a => a.role === '판매');
+        let amHtml = amSale.map(a => `<span class="chip chip-selectable" onclick="quickRemoveAssignment('${d.dateStr}', 'am', '${a.id}')" title="클릭 시 삭제">${getPersonName(a.id)} ✕</span>`).join(' ');
+        if (amSale.length === 0) amHtml = `<span style="color:#c53030; font-weight:600;">[미배정 필수]</span>`;
+
+        // PM Machine (Mon-Thu only)
+        let machineHtml = '-';
+        if (!d.isFriday) {
+          const pmMach = plan.pm.filter(a => a.role === '기계');
+          if (pmMach.length > 0) {
+            machineHtml = pmMach.map(a => `<span class="chip chip-selectable" style="background:#edf2f7;" onclick="quickRemoveAssignment('${d.dateStr}', 'pm', '${a.id}')" title="클릭 시 삭제">${getPersonName(a.id)} ✕</span>`).join(' ');
+          } else {
+            machineHtml = `<span style="color:var(--color-graphite); font-size:12px;">(미배정·협의)</span>`;
+          }
+        }
+
+        // PM Sale
+        const pmSale = plan.pm.filter(a => a.role === '판매');
+        let pmSaleHtml = pmSale.map(a => `<span class="chip chip-selectable" onclick="quickRemoveAssignment('${d.dateStr}', 'pm', '${a.id}')" title="클릭 시 삭제">${getPersonName(a.id)} ✕</span>`).join(' ');
+        if (pmSale.length === 0) pmSaleHtml = `<span style="color:#c53030; font-weight:600;">[미배정 필수]</span>`;
+
+        // PM Produce (Mon-Thu only)
+        let pmProdHtml = '-';
+        if (!d.isFriday) {
+          const pmProd = plan.pm.filter(a => a.role === '생산');
+          pmProdHtml = pmProd.map(a => `<span class="chip chip-selectable" onclick="quickRemoveAssignment('${d.dateStr}', 'pm', '${a.id}')" title="클릭 시 삭제">${getPersonName(a.id)} ✕</span>`).join(' ');
+          if (pmProd.length === 0) pmProdHtml = `<span style="color:#c53030; font-weight:600;">[미배정 필수]</span>`;
+        }
+
+        const totalDayPeople = plan.am.length + plan.pm.length;
+
+        tr.innerHTML = `
+          <td>${dateCol}</td>
+          <td>${typeCol}</td>
+          <td>${amHtml}</td>
+          <td>${machineHtml}</td>
+          <td>${pmSaleHtml}</td>
+          <td>${pmProdHtml}</td>
+          <td><strong>${totalDayPeople}</strong>명</td>
+          <td>
+            <button class="btn btn-ghost btn-sm" onclick="openManualEditForDate('${d.dateStr}')">✏️ 편집</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    /* 6.2 Schedule Calendar Render */
+    function renderScheduleCalendar(opDays) {
+      const grid = document.getElementById('calendarGridBody');
+      grid.innerHTML = '';
+
+      if (opDays.length === 0) return;
+
+      // Fill leading blanks for day of week of the 1st day
+      const firstDayOfWeek = opDays[0].dayOfWeek;
+      for (let i = 0; i < firstDayOfWeek; i++) {
+        const blank = document.createElement('div');
+        blank.className = 'calendar-day-cell other-month';
+        grid.appendChild(blank);
+      }
+
+      opDays.forEach(d => {
+        const plan = currentSchedule[d.dateStr] || { am: [], pm: [] };
+        const cell = document.createElement('div');
+        let cellClass = 'calendar-day-cell';
+        if (d.isWeekend) cellClass += ' weekend';
+        if (d.isHoliday) cellClass += ' holiday';
+        cell.className = cellClass;
+        cell.onclick = () => { if (d.isOperating) openManualEditForDate(d.dateStr); };
+
+        let content = `
+          <div class="day-num">
+            <span>${d.day} <small style="font-size:10px; color:var(--color-graphite);">(${d.dayName})</small></span>
+            ${d.isHoliday ? `<span class="day-badge chip-danger">${d.holidayName}</span>` : ''}
+          </div>
+        `;
+
+        if (d.isOperating) {
+          content += `<div style="font-size:11px; margin-top:2px;">`;
+          content += `<div style="color:var(--color-deep-teal); font-weight:600;">오전(${plan.am.length}/2): ${plan.am.map(a => getPersonName(a.id)).join(', ') || '공석'}</div>`;
+          const pmMach = plan.pm.filter(a => a.role === '기계').map(a => getPersonName(a.id)).join('');
+          const pmSale = plan.pm.filter(a => a.role === '판매').map(a => getPersonName(a.id)).join(', ');
+          const pmProd = plan.pm.filter(a => a.role === '생산').map(a => getPersonName(a.id)).join(', ');
+          content += `<div style="color:var(--color-ink); margin-top:3px;">오후(${plan.pm.length}):</div>`;
+          if (pmMach) content += `<div style="color:#6b46c1; font-size:10px;">기계: ${pmMach}</div>`;
+          if (pmSale) content += `<div style="color:#2b6cb0; font-size:10px;">판매: ${pmSale}</div>`;
+          if (pmProd) content += `<div style="color:#2f855a; font-size:10px;">생산: ${pmProd}</div>`;
+          content += `</div>`;
+        }
+
+        cell.innerHTML = content;
+        grid.appendChild(cell);
+      });
+    }
+
+    function setScheduleView(mode) {
+      currentScheduleViewMode = mode;
+      document.getElementById('viewScheduleTable').style.display = mode === 'table' ? 'block' : 'none';
+      document.getElementById('viewScheduleCalendar').style.display = mode === 'calendar' ? 'block' : 'none';
+      document.getElementById('btnViewTable').className = mode === 'table' ? 'btn btn-sm btn-teal' : 'btn btn-sm btn-ghost';
+      document.getElementById('btnViewCalendar').className = mode === 'calendar' ? 'btn btn-sm btn-teal' : 'btn btn-sm btn-ghost';
+    }
+
+    /* 6.3 Shortage and Recommendation Table */
+    function renderShortageTable(analysis) {
+      const tbody = document.getElementById('shortageTableBody');
+      tbody.innerHTML = '';
+
+      analysis.forEach(item => {
+        const p = item.participant;
+        const tr = document.createElement('tr');
+
+        let recButtons = '';
+        if (item.shortage > 0) {
+          if (item.recommendedDates.length > 0) {
+            // Show up to 5 recommendations
+            recButtons = item.recommendedDates.slice(0, 5).map(rec => {
+              const badgeStyle = rec.isPrefDay ? 'background-color: var(--color-deep-teal); color:white;' : 'background-color:#edf2f7; color:var(--color-ink);';
+              const prefText = rec.isPrefDay ? '희망일' : '추가일';
+              return `
+                <button class="btn btn-sm" style="${badgeStyle} margin: 2px; font-size: 11px;" 
+                        onclick="assignRecommendedDate('${p.id}', '${rec.dateStr}', '${rec.shift}', '${rec.role}')"
+                        title="${rec.dateStr} (${rec.dayName}) ${rec.shift} ${rec.role} 배정 (잔여 ${rec.remaining}석)">
+                  + ${rec.dateStr.substring(5)}(${rec.dayName}) [${prefText}·${rec.role}]
+                </button>
+              `;
+            }).join('');
+          } else {
+            recButtons = `<span style="color:var(--color-ash); font-size:12px;">추가 가능 슬롯 없음 (일정/역할 제한)</span>`;
+          }
+        } else {
+          recButtons = `<span class="chip chip-teal" style="font-size:11px;">✓ 8회 달성 완료</span>`;
+        }
+
+        tr.innerHTML = `
+          <td><code>${p.id}</code></td>
+          <td><strong>${p.name}</strong></td>
+          <td><span class="chip">${p.shift}</span></td>
+          <td>${p.days.join(', ')}</td>
+          <td style="font-size:12px;">판:${p.sale} / 생:${p.produce} / 기:${p.machine}</td>
+          <td><strong>${item.assigned}</strong> / 8</td>
+          <td style="color:${item.shortage > 0 ? '#c53030' : 'var(--color-ink)'}; font-weight:600;">${item.shortage > 0 ? `-${item.shortage}회` : '완료'}</td>
+          <td style="font-size:12px; color:var(--color-graphite);">${item.reasons || '-'}</td>
+          <td>${recButtons}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function assignRecommendedDate(personId, dateStr, shift, role) {
+      if (!currentSchedule[dateStr]) currentSchedule[dateStr] = { am: [], pm: [] };
+      const dayPlan = currentSchedule[dateStr];
+
+      // Absolute safety checks
+      const already = [...dayPlan.am, ...dayPlan.pm].some(a => a.id === personId);
+      if (already) {
+        alert('이미 해당 날짜에 배정되어 있어 중복 배정할 수 없습니다.');
+        return;
+      }
+
+      if (shift === '오전') {
+        if (dayPlan.am.length >= 2) { alert('오전 판매 정원(2명)이 가득 찼습니다.'); return; }
+        dayPlan.am.push({ id: personId, role: '판매' });
+      } else {
+        if (role === '기계') {
+          if (dayPlan.pm.some(a => a.role === '기계')) { alert('기계 정원(1명)이 가득 찼습니다.'); return; }
+        } else if (role === '판매') {
+          if (dayPlan.pm.filter(a => a.role === '판매').length >= 2) { alert('오후 판매 정원(2명)이 가득 찼습니다.'); return; }
+        } else if (role === '생산') {
+          if (dayPlan.pm.filter(a => a.role === '생산').length >= 4) { alert('생산 정원(4명)이 가득 찼습니다.'); return; }
+        }
+        dayPlan.pm.push({ id: personId, role });
+      }
+
+      const ym = document.getElementById('targetYearMonth').value;
+      saveMonthSchedule(ym);
+      renderAll();
+      showBanner('success', `${getPersonName(personId)} 참여자가 ${dateStr} (${shift} ${role})에 배정되었습니다.`);
+    }
+
+    function quickRemoveAssignment(dateStr, shift, personId) {
+      if (scheduleMetadata.status === 'confirmed') {
+        alert('확정된 근무표입니다. 수정하려면 [확정 및 엑셀 다운로드] 탭에서 확정 해제를 먼저 해주세요.');
+        return;
+      }
+      if (!confirm(`${dateStr}에서 ${getPersonName(personId)} 님의 배정을 삭제하시겠습니까?`)) return;
+
+      const dayPlan = currentSchedule[dateStr];
+      if (!dayPlan) return;
+
+      if (shift === 'am') {
+        dayPlan.am = dayPlan.am.filter(a => a.id !== personId);
+      } else {
+        dayPlan.pm = dayPlan.pm.filter(a => a.id !== personId);
+      }
+
+      const ym = document.getElementById('targetYearMonth').value;
+      saveMonthSchedule(ym);
+      renderAll();
+    }
+
+    /* 6.4 Manual Date Inspector Modal/Section */
+    function openManualEditForDate(dateStr) {
+      switchTab('tab-manual');
+      document.getElementById('manualDateSelect').value = dateStr;
+      onManualDateSelected();
+    }
+
+    function onManualDateSelected() {
+      const dateStr = document.getElementById('manualDateSelect').value;
+      if (!dateStr) return;
+
+      const ym = document.getElementById('targetYearMonth').value;
+      const opDays = getOperatingDays(ym);
+      const dayInfo = opDays.find(d => d.dateStr === dateStr);
+
+      if (!dayInfo) return;
+
+      document.getElementById('manualDateInfo').innerText = `${dateStr} (${dayInfo.dayName}) ${dayInfo.isFriday ? '금요일 (판매만)' : '월~목 운영'}`;
+      document.getElementById('manualPmCapacityBadge').innerText = dayInfo.isFriday ? '금요일: 판매 최대 2명만' : '월~목: 기계1, 판매2, 생산4';
+
+      const plan = currentSchedule[dateStr] || { am: [], pm: [] };
+
+      // AM Shift list
+      const amDiv = document.getElementById('manualAmList');
+      if (plan.am.length === 0) {
+        amDiv.innerHTML = '<span style="color:#c53030; font-size:12px;">현재 배정자 없음 (최소 1명 필요)</span>';
+      } else {
+        amDiv.innerHTML = plan.am.map(a => `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid var(--color-warm-mist);">
+            <span><strong>${getPersonName(a.id)}</strong> (${a.role})</span>
+            <button class="btn btn-ghost btn-sm" onclick="quickRemoveAssignment('${dateStr}', 'am', '${a.id}')">삭제</button>
+          </div>
+        `).join('');
+      }
+
+      // PM Shift list
+      const pmDiv = document.getElementById('manualPmList');
+      if (plan.pm.length === 0) {
+        pmDiv.innerHTML = '<span style="color:#c53030; font-size:12px;">현재 배정자 없음 (최소 판매1/생산1 필요)</span>';
+      } else {
+        pmDiv.innerHTML = plan.pm.map(a => `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid var(--color-warm-mist);">
+            <span><strong>${getPersonName(a.id)}</strong> <span class="chip" style="font-size:11px;">${a.role}</span></span>
+            <button class="btn btn-ghost btn-sm" onclick="quickRemoveAssignment('${dateStr}', 'pm', '${a.id}')">삭제</button>
+          </div>
+        `).join('');
+      }
+
+      // Populate drop-downs for this specific date
+      const amSelect = document.getElementById('addAmPersonSelect');
+      const pmSelect = document.getElementById('addPmPersonSelect');
+      amSelect.innerHTML = '<option value="">-- 오전반 참여자 선택 --</option>';
+      pmSelect.innerHTML = '<option value="">-- 오후반 참여자 선택 --</option>';
+
+      const alreadyIds = [...plan.am, ...plan.pm].map(a => a.id);
+      const unav = monthlySettings.unavailable;
+
+      participants.forEach(p => {
+        if (alreadyIds.includes(p.id)) return;
+        const isUnav = (unav[p.id] || []).includes(dateStr);
+        const unavTag = isUnav ? ' [개인불가]' : '';
+        const prefTag = p.days.includes(dayInfo.dayName) ? ' [희망일]' : '';
+
+        if (p.shift === '오전' && p.sale !== '불가') {
+          amSelect.innerHTML += `<option value="${p.id}" ${isUnav ? 'disabled' : ''}>${p.name} (판:${p.sale})${prefTag}${unavTag}</option>`;
+        }
+        if (p.shift === '오후') {
+          pmSelect.innerHTML += `<option value="${p.id}" ${isUnav ? 'disabled' : ''}>${p.name} (판:${p.sale}/생:${p.produce}/기:${p.machine})${prefTag}${unavTag}</option>`;
+        }
+      });
+    }
+
+    function addManualPerson(shift, role) {
+      const dateStr = document.getElementById('manualDateSelect').value;
+      const select = shift === 'AM' ? document.getElementById('addAmPersonSelect') : document.getElementById('addPmPersonSelect');
+      const personId = select.value;
+
+      if (!personId) { alert('참여자를 선택해주세요.'); return; }
+      assignRecommendedDate(personId, dateStr, shift === 'AM' ? '오전' : '오후', role);
+      onManualDateSelected();
+    }
+
+    function addManualPmPerson() {
+      const dateStr = document.getElementById('manualDateSelect').value;
+      const personId = document.getElementById('addPmPersonSelect').value;
+      const role = document.getElementById('addPmRoleSelect').value;
+
+      if (!personId) { alert('참여자를 선택해주세요.'); return; }
+
+      const person = participants.find(p => p.id === personId);
+      if (person) {
+        if (role === '판매' && person.sale === '불가') { alert(`${person.name} 님은 판매 역할이 '불가'로 설정되어 배정할 수 없습니다.`); return; }
+        if (role === '생산' && person.produce === '불가') { alert(`${person.name} 님은 생산 역할이 '불가'로 설정되어 배정할 수 없습니다.`); return; }
+        if (role === '기계' && person.machine === '불가') { alert(`${person.name} 님은 기계 역할이 '불가'로 설정되어 배정할 수 없습니다.`); return; }
+      }
+
+      assignRecommendedDate(personId, dateStr, '오후', role);
+      onManualDateSelected();
+    }
+
+    /* 6.5 Participant Management Table */
+    function renderParticipantTable() {
+      const tbody = document.getElementById('participantTableBody');
+      tbody.innerHTML = '';
+
+      participants.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><code>${p.id}</code></td>
+          <td><strong>${p.name}</strong></td>
+          <td><span class="chip">${p.shift}</span></td>
+          <td>${p.days.join(', ')}</td>
+          <td><span class="chip ${p.sale === '선호' ? 'chip-teal' : (p.sale === '불가' ? 'chip-danger' : '')}">${p.sale}</span></td>
+          <td><span class="chip ${p.produce === '선호' ? 'chip-teal' : (p.produce === '불가' ? 'chip-danger' : '')}">${p.produce}</span></td>
+          <td><span class="chip ${p.machine === '선호' ? 'chip-teal' : (p.machine === '불가' ? 'chip-danger' : '')}">${p.machine}</span></td>
+          <td>${p.prevShortage || 0}회</td>
+          <td>${p.prevPriorityUsed || 0}회</td>
+          <td style="text-align:center;">
+            <button class="btn btn-ghost btn-sm" onclick="openEditParticipantModal('${p.id}')">수정</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteParticipant('${p.id}')">삭제</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openAddParticipantModal() {
+      document.getElementById('modalParticipantTitle').innerText = '참여자 신규 등록';
+      document.getElementById('formPartId').value = `P${String(participants.length + 1).padStart(2, '0')}`;
+      document.getElementById('formPartId').readOnly = false;
+      document.getElementById('formPartName').value = '';
+      document.getElementById('formPartShift').value = '오후';
+      document.querySelectorAll('input[name="formDays"]').forEach(cb => cb.checked = true);
+      document.getElementById('formRoleSale').value = '가능';
+      document.getElementById('formRoleProduce').value = '가능';
+      document.getElementById('formRoleMachine').value = '불가';
+      document.getElementById('participantModal').style.display = 'flex';
+    }
+
+    function openEditParticipantModal(id) {
+      const p = participants.find(x => x.id === id);
+      if (!p) return;
+      document.getElementById('modalParticipantTitle').innerText = '참여자 정보 수정';
+      document.getElementById('formPartId').value = p.id;
+      document.getElementById('formPartId').readOnly = true;
+      document.getElementById('formPartName').value = p.name;
+      document.getElementById('formPartShift').value = p.shift;
+      document.querySelectorAll('input[name="formDays"]').forEach(cb => {
+        cb.checked = p.days.includes(cb.value);
+      });
+      document.getElementById('formRoleSale').value = p.sale;
+      document.getElementById('formRoleProduce').value = p.produce;
+      document.getElementById('formRoleMachine').value = p.machine;
+      document.getElementById('participantModal').style.display = 'flex';
+    }
+
+    function closeParticipantModal() {
+      document.getElementById('participantModal').style.display = 'none';
+    }
+
+    function saveParticipantModal(event) {
+      event.preventDefault();
+      const id = document.getElementById('formPartId').value.trim();
+      const name = document.getElementById('formPartName').value.trim();
+      const shift = document.getElementById('formPartShift').value;
+      const days = Array.from(document.querySelectorAll('input[name="formDays"]:checked')).map(cb => cb.value);
+      const sale = document.getElementById('formRoleSale').value;
+      const produce = document.getElementById('formRoleProduce').value;
+      const machine = document.getElementById('formRoleMachine').value;
+
+      if (!id || !name) { alert('ID와 이름을 입력해주세요.'); return; }
+      if (days.length === 0) { alert('최소 1개 이상의 희망 요일을 선택해야 합니다.'); return; }
+
+      // Validate Shift & Role contradiction (PRD 6.1)
+      if (shift === '오전' && sale === '불가') {
+        alert('오전반은 판매 업무만 운영되므로, 판매 역할을 "불가"로 설정할 수 없습니다.');
+        return;
+      }
+
+      const existingIndex = participants.findIndex(x => x.id === id);
+      if (existingIndex >= 0) {
+        participants[existingIndex] = {
+          ...participants[existingIndex],
+          name, shift, days, sale, produce, machine
+        };
+      } else {
+        participants.push({
+          id, name, shift, days, sale, produce, machine,
+          prevShortage: 0, prevPriorityUsed: 0
+        });
+      }
+
+      saveParticipants();
+      closeParticipantModal();
+      renderAll();
+      showBanner('success', `참여자 [${name}] 정보가 저장되었습니다.`);
+    }
+
+    function deleteParticipant(id) {
+      const p = participants.find(x => x.id === id);
+      if (!confirm(`참여자 [${p ? p.name : id}] 님을 명단에서 삭제하시겠습니까?`)) return;
+      participants = participants.filter(x => x.id !== id);
+      saveParticipants();
+      renderAll();
+    }
+
+    /* 6.6 Holidays and Settings */
+    function renderHolidaysList() {
+      const container = document.getElementById('holidayListContainer');
+      container.innerHTML = '';
+
+      const holidays = Object.entries(monthlySettings.holidays).sort((a,b) => a[0].localeCompare(b[0]));
+      if (holidays.length === 0) {
+        container.innerHTML = '<span style="color:var(--color-ash); font-size:12px;">등록된 휴무일이 없습니다.</span>';
+        return;
+      }
+
+      holidays.forEach(([dateStr, name]) => {
+        container.innerHTML += `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--color-parchment); border-radius:8px; border:1px solid var(--color-warm-mist);">
+            <div><strong>${dateStr}</strong> <span class="chip chip-danger" style="margin-left:6px; font-size:11px;">${name}</span></div>
+            <button class="btn btn-ghost btn-sm" onclick="removeHoliday('${dateStr}')">삭제</button>
+          </div>
+        `;
+      });
+    }
+
+    function addCustomHoliday() {
+      const date = document.getElementById('newHolidayDate').value;
+      const reason = document.getElementById('newHolidayReason').value.trim() || '임시 휴무';
+      if (!date) { alert('휴무일 날짜를 선택해주세요.'); return; }
+
+      monthlySettings.holidays[date] = reason;
+      saveSettings();
+      renderAll();
+      document.getElementById('newHolidayReason').value = '';
+    }
+
+    function removeHoliday(dateStr) {
+      delete monthlySettings.holidays[dateStr];
+      saveSettings();
+      renderAll();
+    }
+
+    function populateSelectOptions() {
+      const pSelect1 = document.getElementById('unavailablePersonSelect');
+      const pSelect2 = document.getElementById('previewPersonSelect');
+      const dateSelect = document.getElementById('manualDateSelect');
+
+      const ym = document.getElementById('targetYearMonth').value;
+      const opDays = getOperatingDays(ym).filter(d => d.isOperating);
+
+      const curP1 = pSelect1.value;
+      const curP2 = pSelect2.value;
+      const curDate = dateSelect.value;
+
+      pSelect1.innerHTML = participants.map(p => `<option value="${p.id}">${p.name} (${p.shift})</option>`).join('');
+      pSelect2.innerHTML = participants.map(p => `<option value="${p.id}">${p.name} (${p.shift})</option>`).join('');
+      dateSelect.innerHTML = opDays.map(d => `<option value="${d.dateStr}">${d.dateStr} (${d.dayName})</option>`).join('');
+
+      if (curP1) pSelect1.value = curP1;
+      if (curP2) pSelect2.value = curP2;
+      if (curDate && opDays.some(d => d.dateStr === curDate)) dateSelect.value = curDate;
+    }
+
+    function renderUnavailableDates() {
+      const personId = document.getElementById('unavailablePersonSelect').value;
+      const container = document.getElementById('selectedPersonUnavailableList');
+      container.innerHTML = '';
+      if (!personId) return;
+
+      const dates = monthlySettings.unavailable[personId] || [];
+      if (dates.length === 0) {
+        container.innerHTML = '<span style="color:var(--color-ash); font-size:12px;">등록된 불가 날짜가 없습니다.</span>';
+        return;
+      }
+
+      dates.forEach(d => {
+        container.innerHTML += `
+          <span class="chip chip-danger chip-selectable" onclick="removeUnavailableDate('${personId}', '${d}')" title="클릭 시 삭제">
+            ${d} ✕
+          </span>
+        `;
+      });
+    }
+
+    function addUnavailableDateForSelected() {
+      const personId = document.getElementById('unavailablePersonSelect').value;
+      const date = document.getElementById('newUnavailableDate').value;
+      if (!personId || !date) { alert('날짜를 선택해주세요.'); return; }
+
+      if (!monthlySettings.unavailable[personId]) monthlySettings.unavailable[personId] = [];
+      if (!monthlySettings.unavailable[personId].includes(date)) {
+        monthlySettings.unavailable[personId].push(date);
+        saveSettings();
+        renderUnavailableDates();
+        renderAll();
+      }
+    }
+
+    function removeUnavailableDate(personId, date) {
+      if (!monthlySettings.unavailable[personId]) return;
+      monthlySettings.unavailable[personId] = monthlySettings.unavailable[personId].filter(d => d !== date);
+      saveSettings();
+      renderUnavailableDates();
+      renderAll();
+    }
+
+    /* 6.7 Confirmation Workflow */
+    function confirmCurrentSchedule() {
+      const { analysis } = analyzeSchedule();
+      const shortPeople = analysis.filter(a => a.shortage > 0).length;
+
+      let msg = '현재 편성된 근무표를 최종 확정하시겠습니까?';
+      if (shortPeople > 0) {
+        msg = `⚠️ 주의: 월 8회 미달 참여자가 ${shortPeople}명 있습니다.\n그래도 현재 편성안으로 확정하시겠습니까?`;
+      }
+
+      if (!confirm(msg)) return;
+
+      const ym = document.getElementById('targetYearMonth').value;
+      scheduleMetadata.status = 'confirmed';
+      scheduleMetadata.confirmedAt = new Date().toISOString();
+
+      // Update competition records for next month carry-over (PRD 4.4 & 4.7)
+      analysis.forEach(item => {
+        const p = participants.find(x => x.id === item.participant.id);
+        if (p) {
+          p.prevShortage = item.shortage;
+          if (item.shortage === 0) p.prevPriorityUsed = (p.prevPriorityUsed || 0) + 1;
+        }
+      });
+      saveParticipants();
+      saveMonthSchedule(ym);
+      renderAll();
+      showBanner('success', '🔒 근무표가 성공적으로 확정되었습니다! 아래에서 전체 엑셀 및 18명 ZIP 파일을 다운로드하세요.');
+    }
+
+    function unconfirmCurrentSchedule() {
+      if (!confirm('근무표 확정을 해제하고 수정 모드로 전환하시겠습니까?')) return;
+      const ym = document.getElementById('targetYearMonth').value;
+      scheduleMetadata.status = 'draft';
+      scheduleMetadata.confirmedAt = null;
+      saveMonthSchedule(ym);
+      renderAll();
+    }
+
+    /* 6.8 Individual Preview */
+    function renderIndividualPreview() {
+      const personId = document.getElementById('previewPersonSelect').value;
+      const container = document.getElementById('individualPreviewContainer');
+      if (!personId) { container.innerHTML = ''; return; }
+
+      const person = participants.find(p => p.id === personId);
+      const ym = document.getElementById('targetYearMonth').value;
+      const opDays = getOperatingDays(ym);
+
+      const mySchedule = [];
+      opDays.forEach(d => {
+        const plan = currentSchedule[d.dateStr] || { am: [], pm: [] };
+        const foundAm = plan.am.find(a => a.id === personId);
+        if (foundAm) {
+          mySchedule.push({ dateStr: d.dateStr, dayName: d.dayName, time: '09:30~12:30', role: foundAm.role, shift: '오전' });
+        }
+        const foundPm = plan.pm.find(a => a.id === personId);
+        if (foundPm) {
+          mySchedule.push({ dateStr: d.dateStr, dayName: d.dayName, time: '13:00~16:00', role: foundPm.role, shift: '오후' });
+        }
+      });
+
+      let html = `
+        <div style="padding: 12px; background: #fff; border-bottom: 1px solid var(--color-warm-mist); display: flex; justify-content: space-between;">
+          <div><strong>남부그린팝 ${person.name} 님 개인 근무표</strong> (${person.shift}반)</div>
+          <div>총 배정 횟수: <strong>${mySchedule.length}</strong> / 8회</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 120px;">날짜</th>
+              <th style="width: 80px;">요일</th>
+              <th style="width: 150px;">근무 시간</th>
+              <th>담당 역할</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      if (mySchedule.length === 0) {
+        html += `<tr><td colspan="4" style="text-align: center; color: var(--color-ash);">배정된 일정이 없습니다.</td></tr>`;
+      } else {
+        mySchedule.forEach(item => {
+          html += `
+            <tr>
+              <td><strong>${item.dateStr}</strong></td>
+              <td>${item.dayName}요일</td>
+              <td>${item.time}</td>
+              <td><span class="chip chip-teal">${item.role}</span></td>
+            </tr>
+          `;
+        });
+      }
+
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+    }
+
+    /* =====================================================================
+       7. EXCEL GENERATION & DOWNLOADS (PRD Section 7)
+       ===================================================================== */
+    // 7.1 Whole Excel
+    function downloadWholeExcel() {
+      const ym = document.getElementById('targetYearMonth').value;
+      const opDays = getOperatingDays(ym);
+      const { analysis } = analyzeSchedule();
+
+      // Workbook
+      const wb = XLSX.utils.book_new();
+
+      // Sheet 1: Main Monthly Schedule
+      const scheduleRows = [
+        ['남부그린팝 공동체사업 월간 근무표'],
+        [`편성 연월: ${ym}`, `상태: ${scheduleMetadata.status === 'confirmed' ? '최종 확정' : '초안'}`, `출력일시: ${new Date().toLocaleString('ko-KR')}`],
+        [],
+        ['날짜', '요일', '구분', '오전 판매 (09:30~12:30)', '오후 기계 (13:00~16:00)', '오후 판매 (13:00~16:00)', '오후 생산 (13:00~16:00)', '일일 합계', '비고']
+      ];
+
+      opDays.forEach(d => {
+        if (!d.isOperating) {
+          scheduleRows.push([
+            d.dateStr,
+            d.dayName,
+            d.isWeekend ? '주말' : '공휴일',
+            '-', '-', '-', '-', 0,
+            d.holidayName || '휴무'
+          ]);
+        } else {
+          const plan = currentSchedule[d.dateStr] || { am: [], pm: [] };
+          const amSale = plan.am.filter(a => a.role === '판매').map(a => getPersonName(a.id)).join(', ') || '미배정';
+          const pmMach = plan.pm.filter(a => a.role === '기계').map(a => getPersonName(a.id)).join(', ') || (d.isFriday ? '-' : '미배정(협의)');
+          const pmSale = plan.pm.filter(a => a.role === '판매').map(a => getPersonName(a.id)).join(', ') || '미배정';
+          const pmProd = plan.pm.filter(a => a.role === '생산').map(a => getPersonName(a.id)).join(', ') || (d.isFriday ? '-' : '미배정');
+          const totalCount = plan.am.length + plan.pm.length;
+
+          scheduleRows.push([
+            d.dateStr,
+            d.dayName,
+            d.isFriday ? '금(판매)' : '월~목',
+            amSale,
+            pmMach,
+            pmSale,
+            pmProd,
+            totalCount,
+            ''
+          ]);
+        }
+      });
+
+      const ws1 = XLSX.utils.aoa_to_sheet(scheduleRows);
+      XLSX.utils.book_append_sheet(wb, ws1, '전체근무표');
+
+      // Sheet 2: Participant Stats & Priority Records
+      const statRows = [
+        ['남부그린팝 참여자별 근무 배정 및 우선권 통계'],
+        [`대상 연월: ${ym}`],
+        [],
+        ['참여자ID', '성명', '근무반', '희망요일', '판매역할', '생산역할', '기계역할', '목표횟수', '실제배정', '부족횟수', '미배정사유', '직전월미배정이력', '우선권적용횟수']
+      ];
+
+      analysis.forEach(item => {
+        const p = item.participant;
+        statRows.push([
+          p.id,
+          p.name,
+          p.shift,
+          p.days.join(', '),
+          p.sale,
+          p.produce,
+          p.machine,
+          8,
+          item.assigned,
+          item.shortage,
+          item.reasons || '정상 완료',
+          p.prevShortage || 0,
+          p.prevPriorityUsed || 0
+        ]);
+      });
+
+      const ws2 = XLSX.utils.aoa_to_sheet(statRows);
+      XLSX.utils.book_append_sheet(wb, ws2, '참여자현황_우선권');
+
+      // Save file
+      const fileName = `남부그린팝_전체근무표_${ym}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    }
+
+    function downloadAllExcel() {
+      downloadWholeExcel();
+    }
+
+    // 7.2 Individual Excel Builder
+    function createIndividualWorkbook(person, ym) {
+      const opDays = getOperatingDays(ym);
+      const mySchedule = [];
+
+      opDays.forEach(d => {
+        const plan = currentSchedule[d.dateStr] || { am: [], pm: [] };
+        const foundAm = plan.am.find(a => a.id === person.id);
+        if (foundAm) {
+          mySchedule.push([d.dateStr, `${d.dayName}요일`, '09:30~12:30', foundAm.role]);
+        }
+        const foundPm = plan.pm.find(a => a.id === person.id);
+        if (foundPm) {
+          mySchedule.push([d.dateStr, `${d.dayName}요일`, '13:00~16:00', foundPm.role]);
+        }
+      });
+
+      const rows = [
+        ['남부그린팝 공동체사업 개인 근무표'],
+        [`성명: ${person.name}`, `근무반: ${person.shift}반`, `해당연월: ${ym}`],
+        [`월간 총 배정: ${mySchedule.length}회 (목표 8회)`, `안내: 지정된 시간 10분 전까지 도착해주세요.`],
+        [],
+        ['날짜', '요일', '근무 시간', '담당 역할']
+      ];
+
+      if (mySchedule.length === 0) {
+        rows.push(['배정된 일정이 없습니다.', '-', '-', '-']);
+      } else {
+        mySchedule.forEach(r => rows.push(r));
+      }
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, '개인근무표');
+      return wb;
+    }
+
+    function downloadSingleIndividualExcel() {
+      const personId = document.getElementById('previewPersonSelect').value;
+      const person = participants.find(p => p.id === personId);
+      if (!person) return;
+      const ym = document.getElementById('targetYearMonth').value;
+
+      const wb = createIndividualWorkbook(person, ym);
+      XLSX.writeFile(wb, `남부그린팝_개인근무표_${ym}_${person.name}.xlsx`);
+    }
+
+    // 7.3 ZIP Download with JSZip
+    async function downloadIndividualZip() {
+      const ym = document.getElementById('targetYearMonth').value;
+      showBanner('info', '📦 참여자 18명의 개인별 엑셀 파일을 생성하여 ZIP으로 압축 중입니다...');
+
+      const zip = new JSZip();
+
+      participants.forEach(person => {
+        const wb = createIndividualWorkbook(person, ym);
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const fileName = `남부그린팝_개인근무표_${ym}_${person.name}.xlsx`;
+        zip.file(fileName, wbout);
+      });
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      saveAs(zipBlob, `남부그린팝_개인근무표_${ym}_일괄.zip`);
+      showBanner('success', `🎉 전체 개인 근무표 ZIP 파일(남부그린팝_개인근무표_${ym}_일괄.zip) 다운로드가 완료되었습니다.`);
+    }
+
+    // 7.4 Participant Excel Template Download & Upload (PRD 6.1)
+    function downloadParticipantTemplate() {
+      const wb = XLSX.utils.book_new();
+      const rows = [
+        ['참여자ID', '표시이름', '근무반', '희망요일', '판매', '생산', '기계'],
+        ['P01', '홍길동', '오전', '월,화,목', '선호', '불가', '불가'],
+        ['P02', '이순신', '오후', '월,화,수,목', '가능', '선호', '선호']
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, '참여자양식');
+      XLSX.writeFile(wb, '남부그린팝_참여자_업로드양식.xlsx');
+    }
+
+    function handleExcelUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const json = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+          if (json.length < 2) {
+            alert('유효한 데이터 행이 없습니다.');
+            return;
+          }
+
+          const header = json[0];
+          const newParticipants = [];
+
+          for (let i = 1; i < json.length; i++) {
+            const row = json[i];
+            if (!row || row.length < 3) continue;
+
+            const id = String(row[0] || '').trim();
+            const name = String(row[1] || '').trim();
+            const shift = String(row[2] || '').trim();
+            const daysStr = String(row[3] || '').trim();
+            const sale = String(row[4] || '가능').trim();
+            const produce = String(row[5] || '가능').trim();
+            const machine = String(row[6] || '불가').trim();
+
+            if (!id || !name) continue;
+
+            const days = daysStr.split(/[,/ ]+/).filter(d => ['월','화','수','목','금'].includes(d));
+
+            newParticipants.push({
+              id,
+              name,
+              shift: shift.includes('오전') ? '오전' : '오후',
+              days: days.length > 0 ? days : ['월', '수', '금'],
+              sale: ['선호', '가능', '불가'].includes(sale) ? sale : '가능',
+              produce: ['선호', '가능', '불가'].includes(produce) ? produce : '가능',
+              machine: ['선호', '가능', '불가'].includes(machine) ? machine : '불가',
+              prevShortage: 0,
+              prevPriorityUsed: 0
+            });
+          }
+
+          if (newParticipants.length > 0) {
+            participants = newParticipants;
+            saveParticipants();
+            renderAll();
+            showBanner('success', `엑셀에서 ${newParticipants.length}명의 참여자 명단을 성공적으로 불러왔습니다.`);
+          } else {
+            alert('양식에 맞는 참여자 데이터를 찾지 못했습니다.');
+          }
+        } catch (err) {
+          alert('엑셀 파일 파싱 중 오류가 발생했습니다: ' + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+      event.target.value = '';
+    }
+
+    /* =====================================================================
+       8. UI HELPERS & NAVIGATION
+       ===================================================================== */
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.nav-tab-btn').forEach(btn => btn.classList.remove('active'));
+
+      const activeSection = document.getElementById(tabId);
+      if (activeSection) activeSection.style.display = 'block';
+
+      // Find matching tab button
+      const buttons = document.querySelectorAll('.nav-tab-btn');
+      buttons.forEach(btn => {
+        if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(tabId)) {
+          btn.classList.add('active');
+        }
+      });
+    }
+
+    function showBanner(type, message) {
+      const banner = document.getElementById('statusBanner');
+      banner.style.display = 'block';
+      banner.className = `alert-box alert-${type}`;
+      banner.innerHTML = `<span>${message}</span>`;
+      setTimeout(() => {
+        banner.style.display = 'none';
+      }, 7000);
+    }
+
+    // Launch App
+    window.addEventListener('DOMContentLoaded', () => {
+      init();
+    });
+  </script>
+</body>
+</html>
