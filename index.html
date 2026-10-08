@@ -1010,7 +1010,7 @@
             
             <div style="margin-bottom: 14px;">
               <label style="font-weight: 600; font-size: 12px; display: block; margin-bottom: 4px;">Project URL</label>
-              <input type="text" id="supabaseUrlInput" class="input" style="width: 100%;" placeholder="https://xxxxxxxx.supabase.co">
+              <input type="text" id="supabaseUrlInput" class="input" style="width: 100%;" value="https://bvgmgqcdvufnbfgzjeah.supabase.co" placeholder="https://xxxxxxxx.supabase.co">
               <small style="color: var(--color-ash); font-size: 11px;">Supabase 대시보드 &gt; Project Settings &gt; API &gt; Project URL</small>
             </div>
 
@@ -1325,7 +1325,7 @@
       </p>
       <div style="margin-bottom: 12px;">
         <label style="font-weight: 600; font-size: 12px; display: block; margin-bottom: 4px;">Project URL</label>
-        <input type="text" id="modalSupabaseUrlInput" class="input" style="width: 100%;" placeholder="https://xxxxxxxx.supabase.co">
+        <input type="text" id="modalSupabaseUrlInput" class="input" style="width: 100%;" value="https://bvgmgqcdvufnbfgzjeah.supabase.co" placeholder="https://xxxxxxxx.supabase.co">
       </div>
       <div style="margin-bottom: 14px;">
         <label style="font-weight: 600; font-size: 12px; display: block; margin-bottom: 4px;">Anon Public Key</label>
@@ -1397,11 +1397,20 @@
     let isSupabaseConnected = false;
 
     function getSupabaseConfig() {
+      const defaultUrl = 'https://bvgmgqcdvufnbfgzjeah.supabase.co';
       try {
         const saved = localStorage.getItem(STORAGE_KEY_SUPABASE_CONFIG);
-        return saved ? JSON.parse(saved) : { url: '', key: '', autoSync: true };
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return {
+            url: parsed.url || defaultUrl,
+            key: parsed.key || '',
+            autoSync: parsed.autoSync !== false
+          };
+        }
+        return { url: defaultUrl, key: '', autoSync: true };
       } catch (e) {
-        return { url: '', key: '', autoSync: true };
+        return { url: defaultUrl, key: '', autoSync: true };
       }
     }
 
